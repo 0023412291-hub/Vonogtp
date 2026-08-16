@@ -1,24 +1,38 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import React from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { COLORS } from '@/constants/colors';
+import { AppProvider } from '@/context/app-context';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  // Màn hình mở đầu khi khởi động app (expo-router v5+: anchor thay cho initialRouteName)
+  anchor: 'splash',
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppProvider>
+        <Stack
+          initialRouteName="splash"
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: COLORS.white },
+            animation: 'slide_from_right',
+          }}
+        >
+          <Stack.Screen name="splash" />
+          <Stack.Screen name="needs" />
+          <Stack.Screen name="permissions" />
+          <Stack.Screen name="auth" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="listing/[id]" />
+          <Stack.Screen name="search" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+        </Stack>
+        <StatusBar style="dark" />
+      </AppProvider>
+    </GestureHandlerRootView>
   );
 }

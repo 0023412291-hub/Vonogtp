@@ -1,0 +1,1171 @@
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { ActionButton } from '@/components/action-button';
+import { AmenityCheckbox } from '@/components/amenity-checkbox';
+import { FormField } from '@/components/form-field';
+import { PickerModal } from '@/components/picker-modal';
+import { SectionHeader } from '@/components/section-header';
+import { Stepper } from '@/components/stepper';
+import { StepProgress } from '@/components/step-progress';
+import { BORDER_RADIUS, COLORS } from '@/constants/colors';
+import { useApp } from '@/context/app-context';
+import { DISTRICTS } from '@/data/mock';
+import { AMENITIES, PROPERTY_TYPES, type Condition, type Listing, type PropertyType } from '@/types';
+import { formatPriceShort } from '@/utils/formatters';
+import { isValidPhone } from '@/utils/validation';
+
+const STEP_LABELS = ['Thông tin cơ bản', 'Ảnh', 'Mô tả & tiện nghi', 'Liên hệ', 'Xác nhận'];
+
+interface FormState {
+  title: string;
+  type: PropertyType | null;
+  districtId: string;
+  ward: string;
+  price: string;
+  area: string;
+  bedrooms: number;
+  bathrooms: number;
+  images: string[];
+  description: string;
+  amenities: string[];
+  customAmenities: string[];
+  customInput: string;
+  condition: Condition;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  showPhone: boolean;
+  termsAccepted: boolean;
+}
+
+const INITIAL_FORM: FormState = {
+  title: '',
+  type: null,
+  districtId: '',
+  ward: '',
+  price: '',
+  area: '',
+  bedrooms: 1,
+  bathrooms: 1,
+  images: [],
+  description: '',
+  amenities: [],
+  customAmenities: [],
+  customInput: '',
+  condition: 'new',
+  contactName: '',
+  contactPhone: '',
+  contactEmail: '',
+  showPhone: true,
+  termsAccepted: false,
+};
+
+export default function PostScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { addListing } = useApp();
+
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [districtPicker, setDistrictPicker] = useState(false);
+  const [wardPicker, setWardPicker] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [successId, setSuccessId] = useState<string | null>(null);
+
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const district = DISTRICTS.find((d) => d.id === form.districtId);
+  const selectedType = PROPERTY_TYPES.find((t) => t.value === form.type);
+
+  // ---------- Validation ----------
+  const validateStep = (s: number): boolean => {
+    const e: Record<string, string> = {};
+    if (s === 0) {
+      if (form.title.trim().length < 10) e.title = 'Tiêu đề phải có ít nhất 10 ký tự';
+      if (!form.type) e.type = 'Vui lòng chọn loại hình';
+      if (!form.districtId) e.districtId = 'Vui lòng chọn quận/huyện';
+      if (!form.ward) e.ward = 'Vui lòng chọn phường/xã';
+      if (!form.price || Number(form.price) <= 0) e.price = 'Vui lòng nhập giá hợp lệ';
+      if (!form.area || Number(form.area) <= 0) e.area = 'Vui lòng nhập diện tích hợp lệ';
+    }
+    if (s === 1 && form.images.length < 3) {
+      e.images = 'Vui lòng chọn tối thiểu 3 ảnh';
+    }
+    if (s === 2 && form.description.trim().length < 20) {
+      e.description = 'Mô tả phải có ít nhất 20 ký tự';
+    }
+    if (s === 3) {
+      if (!form.contactName.trim()) e.contactName = 'Vui lòng nhập tên chủ nhà';
+      if (!isValidPhone(form.contactPhone)) e.contactPhone = 'Số điện thoại không hợp lệ';
+    }
+    if (s === 4 && !form.termsAccepted) e.terms = 'Bạn cần đồng ý với điều khoản';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const next = () => {
+    if (validateStep(step)) setStep((s) => Math.min(s + 1, 4));
+  };
+
+  const back = () => {
+    setErrors({});
+    setStep((s) => Math.max(s - 1, 0));
+  };
+
+  // ---------- Images ----------
+  const pickFromLibrary = async () => {
+    const remaining = 12 - form.images.length;
+    if (remaining <= 0) {
+      Alert.alert('Giới hạn', 'Tối đa 12 ảnh mỗi tin đăng.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.7,
+    });
+    if (!result.canceled) {
+      set('images', [...form.images, ...result.assets.map((a) => a.uri)].slice(0, 12));
+    }
+  };
+
+  const takePhoto = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Cần quyền camera', 'Vui lòng cấp quyền camera để chụp ảnh.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+    if (!result.canceled) {
+      set('images', [...form.images, result.assets[0].uri].slice(0, 12));
+    }
+  };
+
+  const removeImage = (idx: number) => set('images', form.images.filter((_, i) => i !== idx));
+  const moveImage = (idx: number, dir: -1 | 1) => {
+    const next = [...form.images];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    set('images', next);
+  };
+
+  // ---------- Submit ----------
+  const submit = () => {
+    if (!validateStep(4)) return;
+    setSubmitting(true);
+    const price = Number(form.price);
+    const area = Number(form.area);
+    const listingData: Omit<Listing, 'id' | 'createdAt' | 'isFavorite' | 'status'> = {
+      title: form.title.trim(),
+      price,
+      area,
+      districtId: form.districtId,
+      district: district?.name ?? '',
+      ward: form.ward,
+      address: `${form.ward}, ${district?.name ?? ''}`,
+      type: form.type ?? 'phong_tro',
+      bedrooms: form.bedrooms,
+      bathrooms: form.bathrooms,
+      description: form.description.trim(),
+      amenities: [...form.amenities, ...form.customAmenities],
+      images: form.images,
+      contact: {
+        name: form.contactName.trim(),
+        phone: form.contactPhone.trim(),
+        email: form.contactEmail.trim() || undefined,
+      },
+      showPhone: form.showPhone,
+      latitude: 10.7769 + (Math.random() - 0.5) * 0.06,
+      longitude: 106.7009 + (Math.random() - 0.5) * 0.06,
+      condition: form.condition,
+    };
+    // Giả lập độ trễ đăng tin
+    setTimeout(() => {
+      setSubmitting(false);
+      const created = addListing(listingData);
+      setSuccessId(created.id);
+      setStep(0);
+    }, 900);
+  };
+
+  // ---------- Success ----------
+  if (successId) {
+    return (
+      <View style={[styles.container, styles.successWrap, { paddingTop: insets.top }]}>
+        <View style={styles.successIcon}>
+          <Ionicons name="checkmark" size={44} color={COLORS.white} />
+        </View>
+        <Text style={styles.successTitle}>Đăng tin thành công!</Text>
+        <Text style={styles.successMsg}>
+          Tin của bạn đã được đăng và sẽ xuất hiện trong danh sách trong vòng vài phút.
+        </Text>
+        <Text style={styles.successId}>ID tin: #{successId.toUpperCase()}</Text>
+        <View style={styles.successActions}>
+          <ActionButton
+            label="Xem tin của bạn"
+            onPress={() => {
+              const id = successId;
+              setSuccessId(null);
+              setForm(INITIAL_FORM);
+              router.push(`/listing/${id}`);
+            }}
+          />
+          <ActionButton
+            label="Quay về trang chủ"
+            variant="soft"
+            onPress={() => {
+              setSuccessId(null);
+              setForm(INITIAL_FORM);
+              router.replace('/(tabs)');
+            }}
+          />
+          <ActionButton
+            label="Đăng tin khác"
+            variant="ghost"
+            onPress={() => {
+              setSuccessId(null);
+              setForm(INITIAL_FORM);
+            }}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // ---------- Render ----------
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <Text style={styles.headerTitle}>Đăng Tin</Text>
+        <StepProgress step={step} total={5} labels={STEP_LABELS} />
+      </View>
+
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.form}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {step === 0 && (
+          <>
+            <SectionHeader title="Thông tin cơ bản" />
+            <FormField
+              label="Tiêu đề tin"
+              required
+              value={form.title}
+              onChangeText={(t) => set('title', t)}
+              placeholder="VD: Phòng rộng mặt tiền, đầy đủ nội thất..."
+              maxLength={100}
+              error={errors.title}
+              counter={{ current: form.title.length, max: 100 }}
+            />
+
+            <Text style={styles.fieldLabel}>
+              Loại hình <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.typeGrid}>
+              {PROPERTY_TYPES.map((t) => {
+                const active = form.type === t.value;
+                return (
+                  <TouchableOpacity
+                    key={t.value}
+                    style={[styles.typeCard, active && styles.typeCardActive]}
+                    onPress={() => set('type', t.value)}
+                  >
+                    <Ionicons
+                      name={active ? 'radio-button-on' : 'radio-button-off'}
+                      size={17}
+                      color={active ? COLORS.warmGold : COLORS.grayMedium}
+                    />
+                    <Text style={[styles.typeText, active && styles.typeTextActive]}>
+                      {t.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {errors.type && <Text style={styles.errorText}>{errors.type}</Text>}
+
+            <Text style={styles.fieldLabel}>
+              Khu vực <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={styles.selectBtn}
+                onPress={() => setDistrictPicker(true)}
+              >
+                <Text style={[styles.selectText, !form.districtId && styles.selectPlaceholder]}>
+                  {district?.name ?? 'Chọn quận/huyện'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.selectBtn, !form.districtId && styles.selectDisabled]}
+                disabled={!form.districtId}
+                onPress={() => setWardPicker(true)}
+              >
+                <Text style={[styles.selectText, !form.ward && styles.selectPlaceholder]}>
+                  {form.ward || 'Chọn phường/xã'}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            {(errors.districtId || errors.ward) && (
+              <Text style={styles.errorText}>{errors.districtId || errors.ward}</Text>
+            )}
+
+            <FormField
+              label="Giá cho thuê (đồng/tháng)"
+              required
+              value={form.price}
+              onChangeText={(t) => set('price', t.replace(/[^0-9]/g, ''))}
+              placeholder="3500000"
+              keyboardType="number-pad"
+              error={errors.price}
+              hint={form.price ? `≈ ${formatPriceShort(Number(form.price))}/tháng` : undefined}
+            />
+
+            <FormField
+              label="Diện tích (m²)"
+              required
+              value={form.area}
+              onChangeText={(t) => set('area', t.replace(/[^0-9.]/g, ''))}
+              placeholder="25"
+              keyboardType="decimal-pad"
+              error={errors.area}
+            />
+
+            <View style={styles.stepperRow}>
+              <View style={styles.stepperInfo}>
+                <Text style={styles.stepperLabel}>Số phòng ngủ</Text>
+                <Text style={styles.stepperHint}>Không bắt buộc</Text>
+              </View>
+              <Stepper value={form.bedrooms} onChange={(v) => set('bedrooms', v)} min={0} max={10} />
+            </View>
+            <View style={styles.stepperRow}>
+              <View style={styles.stepperInfo}>
+                <Text style={styles.stepperLabel}>Số toilet</Text>
+                <Text style={styles.stepperHint}>Không bắt buộc</Text>
+              </View>
+              <Stepper value={form.bathrooms} onChange={(v) => set('bathrooms', v)} min={0} max={10} />
+            </View>
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            <SectionHeader title="Chọn ảnh (tối thiểu 3 ảnh)" />
+            <View style={styles.uploadRow}>
+              <TouchableOpacity style={styles.uploadBtn} onPress={takePhoto}>
+                <Ionicons name="camera-outline" size={26} color={COLORS.warmGold} />
+                <Text style={styles.uploadText}>Chụp ảnh</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.uploadBtn} onPress={pickFromLibrary}>
+                <Ionicons name="images-outline" size={26} color={COLORS.warmGold} />
+                <Text style={styles.uploadText}>Chọn thư viện</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.imageCounter}>
+              Ảnh đã chọn: <Text style={styles.imageCounterStrong}>{form.images.length}/12</Text>
+            </Text>
+
+            <View style={styles.imageGrid}>
+              {form.images.map((uri, i) => (
+                <View key={`${uri}-${i}`} style={styles.imageCell}>
+                  <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
+                  {i === 0 && <Text style={styles.coverBadge}>Ảnh bìa</Text>}
+                  <View style={styles.imageActions}>
+                    <TouchableOpacity
+                      style={[styles.imageActionBtn, i === 0 && styles.imageActionDisabled]}
+                      disabled={i === 0}
+                      onPress={() => moveImage(i, -1)}
+                    >
+                      <Ionicons name="chevron-back" size={15} color={COLORS.white} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.imageActionBtn, i === form.images.length - 1 && styles.imageActionDisabled]}
+                      disabled={i === form.images.length - 1}
+                      onPress={() => moveImage(i, 1)}
+                    >
+                      <Ionicons name="chevron-forward" size={15} color={COLORS.white} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.imageActionBtn, styles.deleteBtn]}
+                      onPress={() => removeImage(i)}
+                    >
+                      <Ionicons name="trash-outline" size={15} color={COLORS.white} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              {form.images.length < 12 && (
+                <TouchableOpacity style={styles.addCell} onPress={pickFromLibrary}>
+                  <Ionicons name="add" size={30} color={COLORS.grayMedium} />
+                  <Text style={styles.addText}>Thêm ảnh</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {errors.images && <Text style={styles.errorText}>{errors.images}</Text>}
+
+            <View style={styles.tipBox}>
+              <Ionicons name="bulb-outline" size={16} color={COLORS.info} />
+              <Text style={styles.tipText}>
+                Mẹo: Ảnh rõ ràng, sáng và đủ góc sẽ có lượt xem nhiều hơn. Ảnh đầu tiên là ảnh bìa của tin.
+              </Text>
+            </View>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <SectionHeader title="Mô tả & tiện nghi" />
+            <FormField
+              label="Mô tả chi tiết"
+              required
+              value={form.description}
+              onChangeText={(t) => set('description', t)}
+              placeholder="Mô tả về phòng, vị trí, tiện ích xung quanh..."
+              multiline
+              numberOfLines={6}
+              maxLength={500}
+              error={errors.description}
+              counter={{ current: form.description.length, max: 500 }}
+            />
+
+            <Text style={styles.fieldLabel}>Tiện nghi (chọn những tiện nghi có sẵn)</Text>
+            <View style={styles.amenityGrid}>
+              {AMENITIES.map((a) => (
+                <AmenityCheckbox
+                  key={a}
+                  label={a}
+                  selected={form.amenities.includes(a)}
+                  onToggle={() =>
+                    set(
+                      'amenities',
+                      form.amenities.includes(a)
+                        ? form.amenities.filter((x) => x !== a)
+                        : [...form.amenities, a],
+                    )
+                  }
+                />
+              ))}
+              {form.customAmenities.map((c) => (
+                <AmenityCheckbox
+                  key={c}
+                  label={c}
+                  selected
+                  onToggle={() => set('customAmenities', form.customAmenities.filter((x) => x !== c))}
+                />
+              ))}
+            </View>
+            <View style={styles.customRow}>
+              <FormField
+                value={form.customInput}
+                onChangeText={(t) => set('customInput', t)}
+                placeholder="Thêm tiện nghi khác..."
+              />
+              <TouchableOpacity
+                style={styles.customAdd}
+                onPress={() => {
+                  const v = form.customInput.trim();
+                  if (v && !form.customAmenities.includes(v)) {
+                    set('customAmenities', [...form.customAmenities, v]);
+                  }
+                  set('customInput', '');
+                }}
+              >
+                <Ionicons name="add" size={20} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.fieldLabel}>Tình trạng bất động sản</Text>
+            <View style={styles.conditionRow}>
+              {(
+                [
+                  { value: 'new', label: 'Mới' },
+                  { value: 'needs_repair', label: 'Cần sửa chữa' },
+                ] as { value: Condition; label: string }[]
+              ).map((c) => {
+                const active = form.condition === c.value;
+                return (
+                  <TouchableOpacity
+                    key={c.value}
+                    style={[styles.conditionChip, active && styles.conditionChipActive]}
+                    onPress={() => set('condition', c.value)}
+                  >
+                    <Ionicons
+                      name={active ? 'radio-button-on' : 'radio-button-off'}
+                      size={16}
+                      color={active ? COLORS.warmGold : COLORS.grayMedium}
+                    />
+                    <Text style={[styles.conditionText, active && styles.conditionTextActive]}>
+                      {c.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <SectionHeader title="Thông tin liên hệ" />
+            <FormField
+              label="Tên chủ nhà"
+              required
+              value={form.contactName}
+              onChangeText={(t) => set('contactName', t)}
+              placeholder="Nguyễn Văn A"
+              error={errors.contactName}
+            />
+            <FormField
+              label="Số điện thoại"
+              required
+              value={form.contactPhone}
+              onChangeText={(t) => set('contactPhone', t)}
+              placeholder="0912345678"
+              keyboardType="phone-pad"
+              prefix="+84"
+              error={errors.contactPhone}
+            />
+            <FormField
+              label="Email (không bắt buộc)"
+              value={form.contactEmail}
+              onChangeText={(t) => set('contactEmail', t)}
+              placeholder="you@example.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.fieldLabel}>Chia sẻ thông tin liên hệ</Text>
+            <View style={styles.privacyOptions}>
+              {(
+                [
+                  { value: true, label: 'Hiển thị SĐT trên tin đăng', desc: 'Người xem có thể gọi trực tiếp' },
+                  { value: false, label: 'Chỉ liên hệ qua tin nhắn', desc: 'Bảo mật số điện thoại của bạn' },
+                ] as { value: boolean; label: string; desc: string }[]
+              ).map((o) => {
+                const active = form.showPhone === o.value;
+                return (
+                  <TouchableOpacity
+                    key={String(o.value)}
+                    style={[styles.privacyOption, active && styles.privacyOptionActive]}
+                    onPress={() => set('showPhone', o.value)}
+                  >
+                    <Ionicons
+                      name={active ? 'radio-button-on' : 'radio-button-off'}
+                      size={18}
+                      color={active ? COLORS.warmGold : COLORS.grayMedium}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.privacyLabel, active && styles.privacyLabelActive]}>
+                        {o.label}
+                      </Text>
+                      <Text style={styles.privacyDesc}>{o.desc}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={styles.tipBox}>
+              <Ionicons name="information-circle-outline" size={16} color={COLORS.info} />
+              <Text style={styles.tipText}>
+                Mẹo: Hiển thị SĐT sẽ nhận được nhiều cuộc gọi hơn từ người có nhu cầu thật.
+              </Text>
+            </View>
+          </>
+        )}
+
+        {step === 4 && (
+          <>
+            <SectionHeader title="Xác nhận thông tin" />
+            <View style={styles.previewCard}>
+              <Image
+                source={{ uri: form.images[0] }}
+                style={styles.previewImg}
+                contentFit="cover"
+              />
+              <View style={styles.previewInfo}>
+                <Text style={styles.previewTitle} numberOfLines={2}>
+                  {form.title}
+                </Text>
+                <Text style={styles.previewPrice}>
+                  {formatPriceShort(Number(form.price))}/tháng
+                </Text>
+                <Text style={styles.previewMeta} numberOfLines={1}>
+                  {form.area}m² • {form.ward || district?.name}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryLabel}>Mô tả</Text>
+              <Text style={styles.summaryText} numberOfLines={3}>
+                {form.description}
+              </Text>
+            </View>
+
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryLabel}>Tiện nghi</Text>
+              <View style={styles.summaryChips}>
+                {[...form.amenities, ...form.customAmenities].map((a) => (
+                  <View key={a} style={styles.summaryChip}>
+                    <Text style={styles.summaryChipText}>{a}</Text>
+                  </View>
+                ))}
+                {form.amenities.length + form.customAmenities.length === 0 && (
+                  <Text style={styles.summaryText}>Không có</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryLabel}>Liên hệ</Text>
+              <Text style={styles.summaryText}>
+                {form.contactName} • {form.showPhone ? form.contactPhone : 'Ẩn số (chat)'}
+              </Text>
+            </View>
+
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryLabel}>Loại hình</Text>
+              <Text style={styles.summaryText}>
+                {selectedType?.label} • {form.bedrooms} phòng ngủ • {form.bathrooms} toilet
+              </Text>
+            </View>
+
+            <TouchableOpacity style={styles.termsRow} onPress={() => set('termsAccepted', !form.termsAccepted)}>
+              <Ionicons
+                name={form.termsAccepted ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={form.termsAccepted ? COLORS.warmGold : COLORS.grayMedium}
+              />
+              <Text style={styles.termsText}>
+                Tôi đồng ý với <Text style={styles.termsLink}>Điều khoản sử dụng</Text> và{' '}
+                <Text style={styles.termsLink}>Chính sách đăng tin</Text> của VoNo.
+              </Text>
+            </TouchableOpacity>
+            {errors.terms && <Text style={styles.errorText}>{errors.terms}</Text>}
+          </>
+        )}
+      </ScrollView>
+
+      {/* Bottom nav */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+        {step > 0 && (
+          <ActionButton label="Quay lại" variant="soft" onPress={back} style={styles.bottomBack} />
+        )}
+        {step < 4 ? (
+          <ActionButton
+            label="Tiếp tục"
+            icon="arrow-forward"
+            onPress={next}
+            style={styles.bottomNext}
+          />
+        ) : (
+          <ActionButton
+            label="ĐĂNG TIN"
+            icon="hammer-outline"
+            loading={submitting}
+            onPress={submit}
+            style={styles.bottomNext}
+          />
+        )}
+      </View>
+
+      {/* District picker */}
+      <PickerModal
+        visible={districtPicker}
+        title="Chọn quận/huyện"
+        options={DISTRICTS.map((d) => ({ label: d.name, value: d.id }))}
+        selected={form.districtId}
+        onSelect={(v) => {
+          set('districtId', v);
+          set('ward', '');
+          setDistrictPicker(false);
+        }}
+        onClose={() => setDistrictPicker(false)}
+      />
+
+      {/* Ward picker */}
+      <PickerModal
+        visible={wardPicker}
+        title="Chọn phường/xã"
+        options={(district?.wards ?? []).map((w) => ({ label: w, value: w }))}
+        selected={form.ward}
+        onSelect={(v) => {
+          set('ward', v);
+          setWardPicker(false);
+        }}
+        onClose={() => setWardPicker(false)}
+      />
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  flex: { flex: 1 },
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: COLORS.darkBrown,
+    marginTop: 6,
+  },
+  form: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  required: {
+    color: COLORS.errorRed,
+  },
+  errorText: {
+    fontSize: 11,
+    color: COLORS.errorRed,
+    marginTop: 5,
+  },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  typeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    width: '48.5%',
+  },
+  typeCardActive: {
+    borderColor: COLORS.warmGold,
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+  },
+  typeText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.text,
+  },
+  typeTextActive: {
+    color: COLORS.darkBrown,
+    fontWeight: '700',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  selectBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: COLORS.white,
+  },
+  selectDisabled: {
+    opacity: 0.5,
+  },
+  selectText: {
+    fontSize: 13,
+    color: COLORS.text,
+  },
+  selectPlaceholder: {
+    color: COLORS.placeholder,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  stepperInfo: {
+    gap: 2,
+  },
+  stepperLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.darkBrown,
+  },
+  stepperHint: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  },
+  uploadRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  uploadBtn: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 18,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: COLORS.warmGold,
+    backgroundColor: 'rgba(212, 175, 55, 0.06)',
+  },
+  uploadText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.darkBrown,
+  },
+  imageCounter: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 10,
+  },
+  imageCounterStrong: {
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 14,
+  },
+  imageCell: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imageThumb: {
+    width: '100%',
+    height: '100%',
+  },
+  coverBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: COLORS.warmGold,
+    color: COLORS.white,
+    fontSize: 9,
+    fontWeight: '800',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  imageActions: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    flexDirection: 'row',
+    gap: 4,
+  },
+  imageActionBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageActionDisabled: {
+    opacity: 0.3,
+  },
+  deleteBtn: {
+    backgroundColor: COLORS.errorRed,
+  },
+  addCell: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  addText: {
+    fontSize: 11,
+    color: COLORS.grayMedium,
+  },
+  tipBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(13, 115, 119, 0.08)',
+    borderRadius: BORDER_RADIUS.md,
+    padding: 12,
+    marginTop: 4,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.text,
+    lineHeight: 17,
+  },
+  amenityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 10,
+  },
+  customRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    marginBottom: 16,
+  },
+  customAdd: {
+    width: 44,
+    height: 44,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.warmGold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  conditionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  conditionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  conditionChipActive: {
+    borderColor: COLORS.warmGold,
+    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+  },
+  conditionText: {
+    fontSize: 13,
+    color: COLORS.text,
+  },
+  conditionTextActive: {
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+  },
+  privacyOptions: {
+    gap: 8,
+    marginBottom: 14,
+  },
+  privacyOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    padding: 12,
+  },
+  privacyOptionActive: {
+    borderColor: COLORS.warmGold,
+  },
+  privacyLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  privacyLabelActive: {
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+  },
+  privacyDesc: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  previewCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 16,
+  },
+  previewImg: {
+    width: 108,
+    height: 108,
+  },
+  previewInfo: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  previewTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+    lineHeight: 18,
+  },
+  previewPrice: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.warmGold,
+  },
+  previewMeta: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+  },
+  summarySection: {
+    marginBottom: 14,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.bronze,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  summaryText: {
+    fontSize: 13,
+    color: COLORS.text,
+    lineHeight: 19,
+  },
+  summaryChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  summaryChip: {
+    backgroundColor: 'rgba(42, 157, 143, 0.1)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  summaryChipText: {
+    fontSize: 11,
+    color: COLORS.successGreen,
+    fontWeight: '600',
+  },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.text,
+    lineHeight: 17,
+  },
+  termsLink: {
+    color: COLORS.warmGold,
+    fontWeight: '700',
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  bottomBack: {
+    flex: 0.45,
+  },
+  bottomNext: {
+    flex: 1,
+  },
+
+  // Success
+  successWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  successIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: COLORS.successGreen,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.darkBrown,
+    marginBottom: 8,
+  },
+  successMsg: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  successId: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.warmGold,
+    marginBottom: 24,
+  },
+  successActions: {
+    alignSelf: 'stretch',
+    gap: 10,
+  },
+});
