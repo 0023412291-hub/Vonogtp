@@ -10,9 +10,13 @@ export function ListingSkeleton() {
         <View key={i} style={styles.card}>
           <View style={styles.image} />
           <View style={styles.content}>
-            <View style={[styles.line, { width: '90%' }]} />
-            <View style={[styles.line, { width: '60%' }]} />
-            <View style={[styles.line, { width: '40%', height: 12 }]} />
+            <View style={[styles.line, { width: '55%', height: 14 }]} />
+            <View style={[styles.line, { width: '95%' }]} />
+            <View style={[styles.line, { width: '80%' }]} />
+            <View style={[styles.line, { width: '65%', height: 10 }]} />
+            <View style={[styles.line, { width: '45%', height: 10 }]} />
+            <View style={styles.footerLine} />
+            <View style={[styles.line, { width: '50%', height: 9 }]} />
           </View>
         </View>
       ))}
@@ -36,11 +40,16 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 10,
-    gap: 8,
+    gap: 7,
   },
   line: {
     height: 12,
     borderRadius: 6,
     backgroundColor: COLORS.grayLight,
+  },
+  footerLine: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginTop: 4,
   },
 });

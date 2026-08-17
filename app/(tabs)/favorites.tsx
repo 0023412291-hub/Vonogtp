@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     color: COLORS.darkBrown,
   },
   countBadge: {
-    backgroundColor: 'rgba(212, 175, 55, 0.15)',
+    backgroundColor: 'rgba(14, 143, 142, 0.15)',
     paddingHorizontal: 9,
     paddingVertical: 2,
     borderRadius: 10,

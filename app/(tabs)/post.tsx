@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -78,7 +78,9 @@ const INITIAL_FORM: FormState = {
 export default function PostScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { addListing } = useApp();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const { addListing, getListing, updateListing } = useApp();
+  const isEdit = Boolean(editId);
 
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
@@ -90,6 +92,36 @@ export default function PostScreen() {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  // Chế độ chỉnh sửa: nạp toàn bộ dữ liệu tin vào form (giống hệt khi đăng)
+  useEffect(() => {
+    if (!editId) return;
+    const l = getListing(editId);
+    if (!l) return;
+    setForm({
+      title: l.title,
+      type: l.type,
+      districtId: l.districtId,
+      ward: l.ward,
+      price: String(l.price),
+      area: String(l.area),
+      bedrooms: l.bedrooms,
+      bathrooms: l.bathrooms,
+      images: l.images,
+      description: l.description,
+      amenities: AMENITIES.filter((a) => l.amenities.includes(a)),
+      customAmenities: l.amenities.filter((a) => !AMENITIES.includes(a)),
+      customInput: '',
+      condition: l.condition ?? 'new',
+      contactName: l.contact.name,
+      contactPhone: l.contact.phone,
+      contactEmail: l.contact.email ?? '',
+      showPhone: l.showPhone,
+      termsAccepted: true,
+    });
+    setStep(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
 
   const district = DISTRICTS.find((d) => d.id === form.districtId);
   const selectedType = PROPERTY_TYPES.find((t) => t.value === form.type);
@@ -198,11 +230,16 @@ export default function PostScreen() {
       longitude: 106.7009 + (Math.random() - 0.5) * 0.06,
       condition: form.condition,
     };
-    // Giả lập độ trễ đăng tin
+    // Giả lập độ trễ lưu
     setTimeout(() => {
       setSubmitting(false);
-      const created = addListing(listingData);
-      setSuccessId(created.id);
+      if (editId) {
+        updateListing(editId, listingData);
+        setSuccessId(editId);
+      } else {
+        const created = addListing(listingData);
+        setSuccessId(created.id);
+      }
       setStep(0);
     }, 900);
   };
@@ -214,9 +251,11 @@ export default function PostScreen() {
         <View style={styles.successIcon}>
           <Ionicons name="checkmark" size={44} color={COLORS.white} />
         </View>
-        <Text style={styles.successTitle}>Đăng tin thành công!</Text>
+        <Text style={styles.successTitle}>{isEdit ? 'Cập nhật tin thành công!' : 'Đăng tin thành công!'}</Text>
         <Text style={styles.successMsg}>
-          Tin của bạn đã được đăng và sẽ xuất hiện trong danh sách trong vòng vài phút.
+          {isEdit
+            ? 'Thay đổi của bạn đã được lưu và áp dụng ngay trên tin đăng.'
+            : 'Tin của bạn đã được đăng và sẽ xuất hiện trong danh sách trong vòng vài phút.'}
         </Text>
         <Text style={styles.successId}>ID tin: #{successId.toUpperCase()}</Text>
         <View style={styles.successActions}>
@@ -258,7 +297,7 @@ export default function PostScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
-        <Text style={styles.headerTitle}>Đăng Tin</Text>
+        <Text style={styles.headerTitle}>{isEdit ? 'Chỉnh Sửa Tin' : 'Đăng Tin'}</Text>
         <StepProgress step={step} total={5} labels={STEP_LABELS} />
       </View>
 
@@ -687,8 +726,8 @@ export default function PostScreen() {
           />
         ) : (
           <ActionButton
-            label="ĐĂNG TIN"
-            icon="hammer-outline"
+            label={isEdit ? 'LƯU THAY ĐỔI' : 'ĐĂNG TIN'}
+            icon={isEdit ? 'checkmark-circle-outline' : 'hammer-outline'}
             loading={submitting}
             onPress={submit}
             style={styles.bottomNext}
@@ -785,7 +824,7 @@ const styles = StyleSheet.create({
   },
   typeCardActive: {
     borderColor: COLORS.warmGold,
-    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    backgroundColor: 'rgba(14, 143, 142, 0.08)',
   },
   typeText: {
     fontSize: 13,
@@ -857,7 +896,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: COLORS.warmGold,
-    backgroundColor: 'rgba(212, 175, 55, 0.06)',
+    backgroundColor: 'rgba(14, 143, 142, 0.06)',
   },
   uploadText: {
     fontSize: 12,
@@ -992,7 +1031,7 @@ const styles = StyleSheet.create({
   },
   conditionChipActive: {
     borderColor: COLORS.warmGold,
-    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    backgroundColor: 'rgba(14, 143, 142, 0.08)',
   },
   conditionText: {
     fontSize: 13,
@@ -1060,7 +1099,7 @@ const styles = StyleSheet.create({
   previewPrice: {
     fontSize: 14,
     fontWeight: '800',
-    color: COLORS.warmGold,
+    color: COLORS.priceAccent,
   },
   previewMeta: {
     fontSize: 11,

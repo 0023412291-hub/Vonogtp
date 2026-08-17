@@ -63,6 +63,20 @@ export function formatDistanceKm(km: number): string {
   return `${km.toFixed(1)}km`;
 }
 
+/** 96 → "1:36" */
+export function formatDuration(totalSec: number): string {
+  const m = Math.floor(totalSec / 60);
+  const s = Math.floor(totalSec % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+/** 12400 → "12.4K", 1500000 → "1.5M" */
+export function formatViews(views: number): string {
+  if (views >= 1_000_000) return `${trimZero((views / 1_000_000).toFixed(1))}M`;
+  if (views >= 1_000) return `${trimZero((views / 1_000).toFixed(1))}K`;
+  return String(views);
+}
+
 export const PRICE_PRESETS: { label: string; min: number | null; max: number | null }[] = [
   { label: 'Tất cả mức giá', min: null, max: null },
   { label: 'Dưới 3 triệu', min: null, max: 3_000_000 },

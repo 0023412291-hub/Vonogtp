@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -34,11 +34,17 @@ export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getListing, toggleFavorite, isFavorite } = useApp();
+  const { getListing, toggleFavorite, isFavorite, trackView } = useApp();
 
   const [showFullDesc, setShowFullDesc] = useState(false);
 
   const listing = getListing(id ?? '');
+
+  // Ghi nhận lượt xem để hiện trong "Tin đã xem gần đây" trên trang profile
+  useEffect(() => {
+    if (listing) trackView(listing.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing?.id]);
 
   if (!listing) {
     return (
@@ -284,7 +290,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 22,
     fontWeight: '800',
-    color: COLORS.warmGold,
+    color: COLORS.priceAccent,
   },
   meta: {
     fontSize: 13,

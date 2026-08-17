@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    backgroundColor: 'rgba(14, 143, 142, 0.1)',
     borderRadius: BORDER_RADIUS.md,
     padding: 12,
     marginTop: 10,
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
   },
   typeCardActive: {
     borderColor: COLORS.warmGold,
-    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    backgroundColor: 'rgba(14, 143, 142, 0.08)',
   },
   typeCardText: {
     flex: 1,

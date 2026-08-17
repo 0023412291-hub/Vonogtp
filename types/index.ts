@@ -33,6 +33,10 @@ export interface Listing {
   contact: ListingContact;
   /** Hiển thị SĐT trên tin hay chỉ liên hệ qua tin nhắn */
   showPhone: boolean;
+  /** Số liệu hiệu quả tin đăng (mock): lượt xem, liên hệ, lượt lưu */
+  views?: number;
+  contactCount?: number;
+  savedCount?: number;
   latitude: number;
   longitude: number;
   isFavorite: boolean;
@@ -43,10 +47,32 @@ export interface Listing {
   condition?: Condition;
 }
 
+/** Chế độ sử dụng: người tìm thuê/mua (renter) hoặc người đăng tin (owner) */
+export type UserRole = 'renter' | 'owner';
+
+export const USER_ROLES: { value: UserRole; label: string; desc: string; icon: string }[] = [
+  { value: 'renter', label: 'Tìm Nhà', desc: 'Xem, lọc và lưu tin phù hợp nhu cầu', icon: 'search-outline' },
+  { value: 'owner', label: 'Đăng Tin', desc: 'Đăng và quản lý tin của bạn', icon: 'megaphone-outline' },
+];
+
 export interface User {
   name: string;
   phone: string;
   email: string;
+  role: UserRole;
+}
+
+/** Video xem nhà trực quan (tour ảo) */
+export interface Video {
+  id: string;
+  title: string;
+  thumbnail: string;
+  videoUrl: string;
+  /** Độ dài video (giây) */
+  durationSec: number;
+  views: number;
+  /** Tin bất động sản liên quan (nếu có) */
+  listingId?: string;
 }
 
 export interface School {

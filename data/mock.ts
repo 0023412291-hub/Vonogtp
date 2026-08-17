@@ -1,4 +1,4 @@
-import type { District, Listing, School } from '@/types';
+import type { District, Listing, School, Video } from '@/types';
 
 export const DISTRICTS: District[] = [
   { id: 'q1', name: 'Quận 1', wards: ['Phường Bến Nghé', 'Phường Bến Thành', 'Phường Đa Kao', 'Phường Nguyễn Thái Bình'] },
@@ -24,7 +24,7 @@ export const SCHOOLS: School[] = [
   { id: 'hcmute', name: 'ĐH Sư phạm Kỹ thuật TP.HCM', shortName: 'ĐH SPKT', latitude: 10.85, longitude: 106.771 },
 ];
 
-export const MOCK_LISTINGS: Listing[] = [
+const RAW_LISTINGS: Listing[] = [
   {
     id: 'bds001',
     title: 'Phòng cao cấp mặt tiền, đầy đủ nội thất Quận 1',
@@ -421,5 +421,210 @@ export const MOCK_LISTINGS: Listing[] = [
   },
 ];
 
-/** Trung tâm TP.HCM dùng làm vùng mặc định cho bản đồ */
+/** Số liệu hiệu quả giả định cho từng tin mock (lượt xem • liên hệ • lượt lưu) */
+const LISTING_PERF: [number, number, number][] = [
+  [12_400, 86, 214],
+  [8_900, 64, 172],
+  [21_600, 132, 388],
+  [5_300, 41, 96],
+  [15_200, 98, 245],
+  [33_100, 205, 612],
+  [3_800, 27, 64],
+  [9_400, 71, 156],
+  [18_700, 118, 297],
+  [2_900, 18, 43],
+  [7_200, 55, 131],
+  [6_800, 49, 118],
+  [14_500, 92, 231],
+  [11_300, 76, 189],
+];
+
+/** Gắn số liệu hiệu quả vào danh sách tin mock (tin do người dùng đăng mặc định = 0) */
+export const MOCK_LISTINGS: Listing[] = RAW_LISTINGS.map((l, i) => {
+  const [views, contactCount, savedCount] = LISTING_PERF[i] ?? [0, 0, 0];
+  return { ...l, views, contactCount, savedCount };
+});
+
 export const HCMC_CENTER = { latitude: 10.7769, longitude: 106.7009 };
+
+/** Video xem nhà trực quan (mock) — nguồn video dùng các clip mẫu công khai */
+export const MOCK_VIDEOS: Video[] = [
+  {
+    id: 'vid001',
+    title: 'Tour nhanh phòng trọ cao cấp Quận 1 — đầy đủ nội thất',
+    thumbnail: 'https://picsum.photos/seed/vonovid01/640/360',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    durationSec: 96,
+    views: 12_400,
+    listingId: 'bds001',
+  },
+  {
+    id: 'vid002',
+    title: 'Căn hộ studio view Landmark, khu đô thị Phú Mỹ Hưng',
+    thumbnail: 'https://picsum.photos/seed/vonovid02/640/360',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    durationSec: 138,
+    views: 8_900,
+    listingId: 'bds002',
+  },
+  {
+    id: 'vid003',
+    title: 'Phòng trọ gần ĐH Bách Khoa — đi bộ 5 phút tới trường',
+    thumbnail: 'https://picsum.photos/seed/vonovid03/640/360',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    durationSec: 75,
+    views: 21_600,
+    listingId: 'bds003',
+  },
+  {
+    id: 'vid004',
+    title: 'Nhà nguyên căn 2 tầng Bình Thạnh — hẻm xe hơi',
+    thumbnail: 'https://picsum.photos/seed/vonovid04/640/360',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    durationSec: 164,
+    views: 5_300,
+    listingId: 'bds004',
+  },
+  {
+    id: 'vid005',
+    title: 'Căn hộ 2PN view sông Tân Bình — tham quan từng phòng',
+    thumbnail: 'https://picsum.photos/seed/vonovid05/640/360',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',
+    durationSec: 121,
+    views: 15_200,
+    listingId: 'bds005',
+  },
+  {
+    id: 'vid006',
+    title: 'Phòng trọ đầy đủ tiện nghi gần ĐH Kinh tế — tour 360°',
+    thumbnail: 'https://picsum.photos/seed/vonovid06/640/360',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+    durationSec: 88,
+    views: 33_100,
+    listingId: 'bds006',
+  },
+];
+
+export interface MockNotification {
+  id: string;
+  /** Vai trò nhận thông báo: renter, owner hoặc cả hai */
+  role: 'renter' | 'owner' | 'both';
+  icon: string;
+  title: string;
+  body: string;
+  time: string;
+}
+
+/** Thông báo mẫu hiển thị trên trang profile, lọc theo chế độ đang dùng */
+export const MOCK_NOTIFICATIONS: MockNotification[] = [
+  {
+    id: 'nt001',
+    role: 'owner',
+    icon: 'megaphone',
+    title: 'Tin của bạn đã được duyệt',
+    body: 'Tin "Phòng trọ cao cấp Quận 1" đã hiển thị công khai và bắt đầu tiếp cận người thuê.',
+    time: '2 phút trước',
+  },
+  {
+    id: 'nt002',
+    role: 'owner',
+    icon: 'chatbubble-ellipses',
+    title: 'Khách quan tâm tin của bạn',
+    body: 'Minh Anh vừa liên hệ tin "Căn hộ studio Landmark". Hãy phản hồi nhanh để chốt đơn.',
+    time: '1 giờ trước',
+  },
+  {
+    id: 'nt003',
+    role: 'owner',
+    icon: 'eye',
+    title: 'Lượt xem tăng vượt trội',
+    body: 'Tin của bạn đạt 12.4K lượt xem trong tuần qua, tăng 32% so với tuần trước.',
+    time: 'Hôm qua',
+  },
+  {
+    id: 'nt004',
+    role: 'renter',
+    icon: 'home',
+    title: 'Tin mới phù hợp bạn',
+    body: '5 tin mới tại Quận 1 trong tầm giá bạn quan tâm. Khám phá ngay!',
+    time: '30 phút trước',
+  },
+  {
+    id: 'nt005',
+    role: 'renter',
+    icon: 'pricetag',
+    title: 'Giảm giá khu vực quan tâm',
+    body: '3 tin tại Bình Thạnh vừa giảm giá, có phòng phù hợp ngân sách của bạn.',
+    time: '3 giờ trước',
+  },
+  {
+    id: 'nt006',
+    role: 'renter',
+    icon: 'heart',
+    title: 'Tin đã lưu sắp hết hạn',
+    body: 'Tin "Phòng trọ mini Quận 5" bạn đã lưu sắp hết hạn đăng, hãy liên hệ sớm.',
+    time: 'Hôm qua',
+  },
+];
+
+export type LeadStatus = 'new' | 'contacted' | 'closed';
+
+export interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  /** Tin mà khách quan tâm */
+  listingId: string;
+  message: string;
+  status: LeadStatus;
+  time: string;
+}
+
+/** Khách quan tâm tin (mock) — hiển thị trên trang profile ở chế độ Đăng Tin */
+export const MOCK_LEADS: Lead[] = [
+  {
+    id: 'ld001',
+    name: 'Minh Anh',
+    phone: '0911222333',
+    listingId: 'bds001',
+    message: 'Phòng còn trống không ạ? Tối nay em qua xem được không?',
+    status: 'new',
+    time: '30 phút trước',
+  },
+  {
+    id: 'ld002',
+    name: 'Hoàng Long',
+    phone: '0933444555',
+    listingId: 'bds002',
+    message: 'Cho hỏi giá còn thương lượng được không ạ?',
+    status: 'new',
+    time: '1 giờ trước',
+  },
+  {
+    id: 'ld003',
+    name: 'Thu Hà',
+    phone: '0977888999',
+    listingId: 'bds001',
+    message: 'Mình muốn đặt cọc luôn, chủ nhà cho mình giữ chỗ nhé!',
+    status: 'contacted',
+    time: '3 giờ trước',
+  },
+  {
+    id: 'ld004',
+    name: 'Quốc Bảo',
+    phone: '0905555666',
+    listingId: 'bds006',
+    message: 'Em ở 2 người có được không? Phòng rộng quá hợp luôn.',
+    status: 'contacted',
+    time: 'Hôm qua',
+  },
+  {
+    id: 'ld005',
+    name: 'Ngọc Trâm',
+    phone: '0966666777',
+    listingId: 'bds004',
+    message: 'Gia đình mình xem nhà cuối tuần này được không ạ?',
+    status: 'closed',
+    time: '2 ngày trước',
+  },
+];

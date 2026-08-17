@@ -13,7 +13,7 @@ interface RatingStarsProps {
 export function RatingStars({ rating, count, size = 13 }: RatingStarsProps) {
   return (
     <View style={styles.container}>
-      <Ionicons name="star" size={size} color={COLORS.warmGold} />
+      <Ionicons name="star" size={size} color={COLORS.priceAccent} />
       <Text style={styles.rating}>{rating.toFixed(1)}</Text>
       {count != null && <Text style={styles.count}>({count} đánh giá)</Text>}
     </View>

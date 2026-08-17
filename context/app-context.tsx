@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 import { MOCK_LISTINGS } from '@/data/mock';
-import { DEFAULT_FILTERS, type Filters, type Listing, type User } from '@/types';
+import { DEFAULT_FILTERS, type Filters, type Listing, type User, type UserRole } from '@/types';
 
 export interface GeoPoint {
   latitude: number;
@@ -13,15 +13,23 @@ interface AppContextValue {
   myListings: Listing[];
   favorites: string[];
   user: User | null;
+  /** Chế độ đang dùng: mặc định renter khi chưa đăng nhập hoặc chưa chọn */
+  activeRole: UserRole;
   filters: Filters;
   signIn: (user: User) => void;
   signOut: () => void;
   toggleFavorite: (id: string) => void;
   isFavorite: (id: string) => boolean;
+  /** Các tin vừa xem gần đây (mới nhất trước) */
+  recentListings: Listing[];
+  /** Ghi nhận lượt xem một tin — thêm vào danh sách gần đây */
+  trackView: (id: string) => void;
   updateFilters: (partial: Partial<Filters>) => void;
   resetFilters: () => void;
   addListing: (data: Omit<Listing, 'id' | 'createdAt' | 'isFavorite' | 'status'>) => Listing;
   deleteListing: (id: string) => void;
+  /** Cập nhật một phần dữ liệu tin đã đăng (dùng trong chỉnh sửa tin) */
+  updateListing: (id: string, partial: Partial<Listing>) => void;
   markRented: (id: string) => void;
   updateUser: (user: Partial<User>) => void;
   getListing: (id: string) => Listing | undefined;
@@ -42,9 +50,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [userLocation, setUserLocation] = useState<GeoPoint | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [recentIds, setRecentIds] = useState<string[]>([]);
 
   const signIn = useCallback((u: User) => setUser(u), []);
   const signOut = useCallback(() => setUser(null), []);
+
+  const activeRole: UserRole = user?.role ?? 'renter';
 
   const toggleFavorite = useCallback((id: string) => {
     setFavorites((prev) =>
@@ -59,6 +70,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isFavorite = useCallback((id: string) => favorites.includes(id), [favorites]);
+
+  const trackView = useCallback((id: string) => {
+    setRecentIds((prev) => [id, ...prev.filter((x) => x !== id)].slice(0, 10));
+  }, []);
+
+  const recentListings = recentIds
+    .map((id) => listings.find((l) => l.id === id))
+    .filter((l): l is Listing => Boolean(l));
 
   const updateFilters = useCallback((partial: Partial<Filters>) => {
     setFilters((prev) => ({ ...prev, ...partial }));
@@ -87,6 +106,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setMyListings((prev) => prev.filter((l) => l.id !== id));
     setListings((prev) => prev.filter((l) => l.id !== id));
     setFavorites((prev) => prev.filter((f) => f !== id));
+  }, []);
+
+  const updateListing = useCallback((id: string, partial: Partial<Listing>) => {
+    setListings((prev) => prev.map((l) => (l.id === id ? { ...l, ...partial } : l)));
+    setMyListings((prev) => prev.map((l) => (l.id === id ? { ...l, ...partial } : l)));
   }, []);
 
   const markRented = useCallback((id: string) => {
@@ -118,15 +142,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       myListings,
       favorites,
       user,
+      activeRole,
       filters,
       signIn,
       signOut,
       toggleFavorite,
       isFavorite,
+      recentListings,
+      trackView,
       updateFilters,
       resetFilters,
       addListing,
       deleteListing,
+      updateListing,
       markRented,
       updateUser,
       getListing,
@@ -140,15 +168,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       myListings,
       favorites,
       user,
+      activeRole,
       filters,
       signIn,
       signOut,
       toggleFavorite,
       isFavorite,
+      recentListings,
+      trackView,
       updateFilters,
       resetFilters,
       addListing,
       deleteListing,
+      updateListing,
       markRented,
       updateUser,
       getListing,

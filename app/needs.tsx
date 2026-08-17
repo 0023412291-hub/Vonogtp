@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   },
   typeCardActive: {
     borderColor: COLORS.warmGold,
-    backgroundColor: 'rgba(212, 175, 55, 0.08)',
+    backgroundColor: 'rgba(14, 143, 142, 0.08)',
   },
   typeText: {
     fontSize: 13,

@@ -1,38 +1,41 @@
 /**
  * VoNo - Tìm Nhà Nhanh
- * Design system tokens (Warm Gold / Brown palette theo spec).
+ * Design system tokens (Teal Xanh biếc - fresh & modern).
  */
 
 export const COLORS = {
   // Primary
   white: '#FFFFFF',
-  softWhite: '#F9F7F4',
-  warmGold: '#D4AF37',
-  bronze: '#8B6F47',
-  darkBrown: '#4A3C2A',
+  softWhite: '#F4F7F7',
+  warmGold: '#0E8F8E',
+  bronze: '#0A7A76',
+  darkBrown: '#16343D',
 
   // Secondary
-  lightGold: '#E8D4A8',
-  darkGold: '#B8960F',
+  lightGold: '#A8D8D5',
+  darkGold: '#0B6E6C',
   errorRed: '#E63946',
   successGreen: '#2A9D8F',
-  grayLight: '#E8E6E1',
-  grayMedium: '#A8A59F',
-  grayDark: '#6B6B6B',
+  grayLight: '#E4ECEC',
+  grayMedium: '#94A6A8',
+  grayDark: '#5C6B70',
 
   // Semantic
   background: '#FFFFFF',
-  surface: '#F9F7F4',
-  text: '#4A3C2A',
-  textSecondary: '#A8A59F',
-  border: '#E8E6E1',
-  placeholder: '#A8A59F',
+  surface: '#F4F7F7',
+  text: '#16343D',
+  textSecondary: '#94A6A8',
+  border: '#E4ECEC',
+  placeholder: '#94A6A8',
 
   // Status
   success: '#2A9D8F',
   warning: '#F5A623',
   error: '#E63946',
   info: '#0D7377',
+
+  // Giá & đánh giá: cam ấm giữ cảm giác "tiền", tránh vàng chóe
+  priceAccent: '#E0912F',
 
   // Overlays
   overlay: 'rgba(23, 32, 51, 0.45)',

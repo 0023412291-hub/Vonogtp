@@ -62,6 +62,8 @@ export default function AuthScreen() {
         name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
         phone: phone || '0912345678',
         email: email.trim(),
+        // Mặc định chế độ 'renter'; người dùng có thể đổi sang 'owner' trong Tài Khoản bất cứ lúc nào
+        role: 'renter',
       });
       router.replace('/(tabs)');
     }, 700);

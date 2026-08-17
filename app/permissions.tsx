@@ -51,7 +51,7 @@ export default function PermissionsScreen() {
   const content = {
     notifications: {
       icon: 'notifications-outline' as const,
-      iconBg: 'rgba(212, 175, 55, 0.12)',
+      iconBg: 'rgba(14, 143, 142, 0.12)',
       title: 'Cho phép nhận thông báo?',
       desc: 'VoNo sẽ gửi cho bạn những tin mới phù hợp với nhu cầu, giá tốt và cập nhật trạng thái tin bạn đang quan tâm.',
       primaryLabel: 'Cho phép thông báo',
