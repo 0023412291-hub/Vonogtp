@@ -119,6 +119,8 @@ Chuyển dữ liệu mock sang **Firestore** (realtime). Khi app chạy bằng d
 
 **Seed tự động:** khi collection `listings` trống, app tự đẩy 14 tin mẫu + khách quan tâm lên Firestore (1 lần/session).
 
+**20 phòng đẹp có ảnh thật:** `npm run seed:rooms` (`scripts/seed-rooms.ts`) — ghi đè 20 tin công khai `bds001`–`bds020` với **ảnh phòng ở thật từ Unsplash** (3 ảnh/tin, đã kiểm tra URL sống), giữ nguyên tin demo & tin người dùng. Đã chạy 21/08/2026 ✅ — hiện Firestore có 23 tin (20 phòng mới + 3 của chủ nhà demo).
+
 **Đã làm 21/08/2026:**
 - Cài `firebase-tools`, login `hhd211105@gmail.com`, tạo `firebase.json` + alias default.
 - `firebase deploy --only firestore:rules` ✅ — CLI đồng thời tự tạo Firestore database (default) vì trước đó project CHƯA có database → dữ liệu chưa từng lưu thật lên cloud. Mở app lần nữa sẽ tự seed lên DB mới.

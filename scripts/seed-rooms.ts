@@ -1,0 +1,698 @@
+/**
+ * Seed 20 PHÒNG ĐẸP CÓ ẢNH THẬT (ảnh phòng ở thật từ Unsplash) lên Firestore.
+ *
+ * Ghi đè bộ tin công khai `bds001`–`bds020`, GIỮ NGUYÊN tin của tài khoản demo
+ * (`demo001`–`demo003`) và mọi tin người dùng đăng.
+ *
+ * Chạy: npx tsx scripts/seed-rooms.ts
+ */
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { cert, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+import type { Listing } from '../types';
+
+const KEY_PATH = resolve(process.cwd(), 'serviceAccountKey.json');
+if (!existsSync(KEY_PATH)) {
+  console.error('[!] Thiếu serviceAccountKey.json ở thư mục gốc.');
+  process.exit(1);
+}
+
+initializeApp({ credential: cert(JSON.parse(readFileSync(KEY_PATH, 'utf8'))) });
+const db = getFirestore();
+
+/** Ảnh phòng ở thật (đã kiểm tra HTTP 200) */
+const IMG = [
+  'photo-1522708323590-d24dbb6b0267', // phòng khách căn hộ hiện đại
+  'photo-1560448204-e02f11c3d0e2', // phòng khách sáng
+  'photo-1502672260266-1c1ef2d93688', // giường trắng tối giản
+  'photo-1493809842364-78817add7ffb', // phòng khách loft
+  'photo-1484154218962-a197022b5858', // bếp căn hộ
+  'photo-1554995207-c18c203602cb', // nội thất hiện đại
+  'photo-1512917774080-9991f1c4c750', // nhà phố cao cấp
+  'photo-1600585154340-be6161a56a0c', // nhà mặt tiền hiện đại
+  'photo-1600607687939-ce8a6c25118c', // nội thất cầu thang
+  'photo-1540518614846-7eded433c457', // phòng ngủ xanh navy
+  'photo-1505693416388-ac5ce068fe85', // phòng ngủ trắng
+  'photo-1540932239986-30128078f3c5', // phòng ngủ tối giản
+  'photo-1586023492125-27b2c045efd7', // ghế thư giãn
+  'photo-1616486338812-3dadae4b4ace', // sofa xanh
+  'photo-1598928506311-c55ded91a20c', // sofa + TV
+  'photo-1556912173-3bb406ef7e77', // bếp trắng
+  'photo-1556911220-bff31c812dba', // bếp gỗ
+  'photo-1513694203232-719a280e022f', // phòng ngủ ấm cúng
+  'photo-1571508601891-ca5e7a713859', // phòng ngủ khách sạn
+  'photo-1560185007-cde436f6a4d0', // phòng tắm
+  'photo-1560185127-6ed189bf02f4', // phòng ngủ
+  'photo-1600210492486-724fe5c67fb0', // phòng ngủ gỗ hiện đại
+  'photo-1600566753086-00f18fb6b3ea', // phòng tắm hiện đại
+  'photo-1493663284031-b7e3aefcae8e', // phòng ngủ đèn ấm
+  'photo-1416331108676-a22ccb276e35', // nhà hồ bơi
+  'photo-1522771739844-6a9f6d5f14af', // phòng cây xanh
+  'photo-1595526114035-0d45ed16cfbf', // phòng ngủ trung tính
+  'photo-1560448075-bb485b067938', // phòng khách sang trọng
+  'photo-1533779283484-8ad4940aa3a8', // phòng ngủ góc làm việc
+  'photo-1502005097973-6a7082348e28', // căn hộ mở
+].map((id) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=800&q=80`);
+
+let imgIdx = 0;
+/** Lấy lần lượt 3 ảnh cho mỗi tin (30 ảnh dùng vòng lại 2 lượt) */
+function nextImages(): string[] {
+  const picks = [0, 1, 2].map(() => IMG[imgIdx++ % IMG.length]);
+  return picks;
+}
+
+const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+
+type RoomSeed = Omit<Listing, 'isFavorite' | 'images'> & { images?: string[] };
+
+const ROOMS: RoomSeed[] = [
+  {
+    id: 'bds001',
+    title: 'Phòng trọ cao cấp mặt tiền Quận 1 — nội thất full, còn trống',
+    price: 4_500_000,
+    area: 25,
+    districtId: 'q1',
+    district: 'Quận 1',
+    ward: 'Phường Bến Nghé',
+    address: '123 Cách Mạng Tháng 8, Quận 1',
+    type: 'phong_tro',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 3,
+    yearBuilt: 2021,
+    description:
+      'Phòng mới sửa 25m² đầy đủ nội thất cao cấp: máy lạnh, tủ lạnh, giường tủ gỗ công nghiệp, WC kính khang trang. Cửa sổ đón sáng, hẻm xe hơi an ninh 24/24. Đi bộ 5 phút ra công viên Tao Đàn, gần chợ và siêu thị.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'WC riêng', 'Nấu ăn', 'Bảo vệ'],
+    contact: { name: 'Nguyễn Văn An', phone: '0912345678', email: 'nguyenvanan@gmail.com' },
+    showPhone: true,
+    latitude: 10.7795,
+    longitude: 106.6855,
+    status: 'active',
+    createdAt: daysAgo(1),
+    rating: 4.8,
+    reviewCount: 12,
+    condition: 'new',
+    views: 12_400,
+    contactCount: 86,
+    savedCount: 214,
+  },
+  {
+    id: 'bds002',
+    title: 'Căn hộ studio view Landmark 81 — nội thất xịn, có gym',
+    price: 6_000_000,
+    area: 35,
+    districtId: 'q7',
+    district: 'Quận 7',
+    ward: 'Phường Tân Phong',
+    address: '72 Nguyễn Hữu Thọ, Quận 7',
+    type: 'can_ho',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 18,
+    yearBuilt: 2022,
+    description:
+      'Studio 35m² thiết kế thông minh, cửa kính toàn view Landmark 81. Nội thất nhập khẩu: sofa, bed bọc nệm, bếp điện từ, máy giặt riêng. Tiện ích chung cư: hồ bơi vô cực, gym, sân vườn. Gần Crescent Mall, Phú Mỹ Hưng.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'Thang máy', 'Bảo vệ', 'Ban công'],
+    contact: { name: 'Trần Thị Bích', phone: '0938222333', email: 'tranbich@gmail.com' },
+    showPhone: true,
+    latitude: 10.7359,
+    longitude: 106.7218,
+    status: 'active',
+    createdAt: daysAgo(2),
+    rating: 4.9,
+    reviewCount: 21,
+    condition: 'new',
+    views: 21_600,
+    contactCount: 132,
+    savedCount: 388,
+  },
+  {
+    id: 'bds003',
+    title: 'Phòng trọ sinh viên gần ĐH Bách Khoa — đi bộ 5 phút tới trường',
+    price: 2_800_000,
+    area: 18,
+    districtId: 'binhthanh',
+    district: 'Bình Thạnh',
+    ward: 'Phường 25',
+    address: '259 Điện Biên Phủ, Bình Thạnh',
+    type: 'phong_tro',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 2,
+    yearBuilt: 2019,
+    description:
+      'Phòng 18m² sạch đẹp cho sinh viên, cách ĐH Bách Khoa 500m. Máy lạnh, WiFi cáp quang, khu bếp chung sạch sẽ, giặt máy miễn phí. Chủ nhà thân thiện, giờ giấc tự do, có chỗ để xe rộng rãi.',
+    amenities: ['WiFi', 'Máy lạnh', 'Giặt ủi', 'Nấu ăn'],
+    contact: { name: 'Lê Hoàng Cường', phone: '0905555444' },
+    showPhone: true,
+    latitude: 10.7893,
+    longitude: 106.6947,
+    status: 'active',
+    createdAt: daysAgo(3),
+    rating: 4.6,
+    reviewCount: 8,
+    condition: 'needs_repair',
+    views: 5_300,
+    contactCount: 41,
+    savedCount: 96,
+  },
+  {
+    id: 'bds004',
+    title: 'Nhà nguyên căn 2 tầng Bình Thạnh — hẻm xe hơi, sân phơi rộng',
+    price: 15_000_000,
+    area: 80,
+    districtId: 'binhthanh',
+    district: 'Bình Thạnh',
+    ward: 'Phường 26',
+    address: '18 Phan Văn Trị, Bình Thạnh',
+    type: 'nha_nguyen_can',
+    bedrooms: 3,
+    bathrooms: 2,
+    floor: 2,
+    yearBuilt: 2018,
+    description:
+      'Nhà 2 tầng 80m² trong hẻm xe hơi Phan Văn Trị. 3 phòng ngủ đều có cửa sổ, nhà bếp rộng, sân thượng phơi đồ thoáng. Gần chợ Bà Chiểu, trường học các cấp. Phù hợp gia đình hoặc ở ghép.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Bếp riêng', 'Ban công'],
+    contact: { name: 'Phạm Minh Đức', phone: '0977666555' },
+    showPhone: true,
+    latitude: 10.8001,
+    longitude: 106.6942,
+    status: 'active',
+    createdAt: daysAgo(4),
+    condition: 'new',
+    views: 8_900,
+    contactCount: 64,
+    savedCount: 172,
+  },
+  {
+    id: 'bds005',
+    title: 'Căn hộ 2PN Tân Bình — nội thất mới 100%, gần sân bay',
+    price: 9_500_000,
+    area: 62,
+    districtId: 'tanbinh',
+    district: 'Tân Bình',
+    ward: 'Phường 13',
+    address: '520 Trường Chinh, Tân Bình',
+    type: 'can_ho',
+    bedrooms: 2,
+    bathrooms: 2,
+    floor: 9,
+    yearBuilt: 2020,
+    description:
+      'Căn hộ 62m² vừa hoàn thiện nội thất gỗ sồi: 2 phòng ngủ, 2 WC, phòng khách có ban công hướng thành phố. Chung cư có thang máy, hầm để xe, bảo vệ trực 24h. Cách sân bay Tân Sơn Nhất 10 phút đi xe.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'Thang máy', 'Bảo vệ'],
+    contact: { name: 'Võ Thị Hoa', phone: '0966777888', email: 'vohoa@gmail.com' },
+    showPhone: true,
+    latitude: 10.8038,
+    longitude: 106.6571,
+    status: 'active',
+    createdAt: daysAgo(5),
+    rating: 4.7,
+    reviewCount: 16,
+    condition: 'new',
+    views: 15_200,
+    contactCount: 98,
+    savedCount: 245,
+  },
+  {
+    id: 'bds006',
+    title: 'Phòng trọ gần ĐH Kinh tế — wc riêng, cửa sổ lớn',
+    price: 3_200_000,
+    area: 20,
+    districtId: 'q10',
+    district: 'Quận 10',
+    ward: 'Phường 15',
+    address: '88 Lâm Văn Bền, Quận 10',
+    type: 'phong_tro',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 4,
+    yearBuilt: 2020,
+    description:
+      'Phòng 20m² xây mới, wc khô ráo, cửa sổ lớn đón gió. Có bếp nấu riêng, máy lạnh, tủ quần áo. Cách ĐH Kinh tế 700m, quanh khu đông ăn uống tiện lợi, an ninh tốt có camera.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'WC riêng', 'Nấu ăn', 'Bảo vệ'],
+    contact: { name: 'Đặng Quốc Huy', phone: '0388889999' },
+    showPhone: true,
+    latitude: 10.7752,
+    longitude: 106.6689,
+    status: 'active',
+    createdAt: daysAgo(6),
+    rating: 4.5,
+    reviewCount: 11,
+    condition: 'new',
+    views: 33_100,
+    contactCount: 205,
+    savedCount: 612,
+  },
+  {
+    id: 'bds007',
+    title: 'Căn hộ mini Gò Vấp — 1PN 1 Gác lửng, giá siêu hạt dẻ',
+    price: 4_000_000,
+    area: 30,
+    districtId: 'govap',
+    district: 'Gò Vấp',
+    ward: 'Phường 5',
+    address: '215 Quang Trung, Gò Vấp',
+    type: 'can_ho',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 5,
+    yearBuilt: 2022,
+    description:
+      'Căn hộ mini 30m² có gác lửng ngủ, dưới là bếp + khách. Nội thất mới tinh: nệm, tủ lạnh, máy giặt cửa trên. Tòa nhà có thang máy, thẻ từ ra vào. Cách metro Quang Trung 300m, thuận tiện về Thủ Đức và trung tâm.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'Thang máy', 'Bảo vệ'],
+    contact: { name: 'Bùi Thị Kim Loan', phone: '0919191919' },
+    showPhone: true,
+    latitude: 10.8312,
+    longitude: 106.6625,
+    status: 'active',
+    createdAt: daysAgo(7),
+    rating: 4.8,
+    reviewCount: 19,
+    condition: 'new',
+    views: 18_700,
+    contactCount: 118,
+    savedCount: 297,
+  },
+  {
+    id: 'bds008',
+    title: 'Căn hộ 3PN Thủ Đức view sông — hồ bơi + gym miễn phí',
+    price: 18_000_000,
+    area: 105,
+    districtId: 'thuduc',
+    district: 'Thủ Đức',
+    ward: 'Phường Hiệp Bình Chánh',
+    address: '963 Quốc Lộ 13, Thủ Đức',
+    type: 'can_ho',
+    bedrooms: 3,
+    bathrooms: 2,
+    floor: 20,
+    yearBuilt: 2021,
+    description:
+      'Căn hộ góc 105m² view sông Sài Gòn tại khu đô thị Vạn Phúc. 3 phòng ngủ rộng, bếp đảo, nội thất đầy đủ từ chủ đầu tư. Hồ bơi, gym, khu vui chơi trẻ em miễn phí cho cư dân. Gần ga Metro số 6.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'Ban công', 'Thang máy', 'Bảo vệ'],
+    contact: { name: 'Trịnh Quốc Long', phone: '0909999000', email: 'trinhquocl@gmail.com' },
+    showPhone: true,
+    latitude: 10.8323,
+    longitude: 106.7181,
+    status: 'active',
+    createdAt: daysAgo(8),
+    rating: 4.3,
+    reviewCount: 5,
+    condition: 'new',
+    views: 6_800,
+    contactCount: 49,
+    savedCount: 118,
+  },
+  {
+    id: 'bds009',
+    title: 'Phòng trọ có ban công Phú Nhuận — yên tĩnh, sạch sẽ',
+    price: 3_500_000,
+    area: 22,
+    districtId: 'phunhuan',
+    district: 'Phú Nhuận',
+    ward: 'Phường 17',
+    address: '42 Nguyễn Kiệp, Phú Nhuận',
+    type: 'phong_tro',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 3,
+    yearBuilt: 2019,
+    description:
+      'Phòng 22m² có ban công nhìn ra cây xanh, rất yên tĩnh phù hợp người đi làm remote. Máy lạnh, tủ lạnh, giường tủ đầy đủ. Nhà vệ sinh riêng, nước nóng năng lượng mặt trời. Khu dân cư văn minh, ít người qua lại.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'WC riêng', 'Ban công'],
+    contact: { name: 'Ngô Thanh Tâm', phone: '0944555666' },
+    showPhone: true,
+    latitude: 10.8012,
+    longitude: 106.6821,
+    status: 'active',
+    createdAt: daysAgo(9),
+    rating: 4.9,
+    reviewCount: 14,
+    condition: 'new',
+    views: 14_500,
+    contactCount: 92,
+    savedCount: 231,
+  },
+  {
+    id: 'bds010',
+    title: 'Nhà mặt tiền Sư Vạn Hạnh — kinh doanh cực đẹp, Q.10',
+    price: 32_000_000,
+    area: 120,
+    districtId: 'q10',
+    district: 'Quận 10',
+    ward: 'Phường 11',
+    address: '420 Sư Vạn Hạnh, Quận 10',
+    type: 'nha_nguyen_can',
+    bedrooms: 4,
+    bathrooms: 4,
+    floor: 3,
+    yearBuilt: 2016,
+    description:
+      'Nhà mặt tiền đường lớn 120m², 3 tầng, 4 phòng ngủ đủ WC. Vị trí kinh doanh đắc địa: quán cà phê, văn phòng, spa, cửa hàng thời trang. Có sân sau để xe, điện 3 pha. Đông đúc, gần chợ và trường học.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Bếp riêng', 'Bảo vệ'],
+    contact: { name: 'Châu Ngọc Nhi', phone: '0935555666', email: 'chaungocn@gmail.com' },
+    showPhone: true,
+    latitude: 10.7661,
+    longitude: 106.6669,
+    status: 'active',
+    createdAt: daysAgo(10),
+    condition: 'new',
+    views: 11_300,
+    contactCount: 76,
+    savedCount: 189,
+  },
+  {
+    id: 'bds011',
+    title: 'Căn hộ 1PN Quận 3 — trung tâm, đi bộ ra chợ Bến Thành',
+    price: 11_000_000,
+    area: 48,
+    districtId: 'q3',
+    district: 'Quận 3',
+    ward: 'Phường Võ Thị Sáu',
+    address: '27 Nguyễn Đình Chiểu, Quận 3',
+    type: 'can_ho',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 7,
+    yearBuilt: 2019,
+    description:
+      'Căn hộ 48m² tọa lạc ngay trung tâm Quận 3. Phòng ngủ khép kín, phòng khách rộng, bếp liền kề. Tòa nhà cũ nhưng được nâng cấp thang máy mới. Đi bộ 10 phút ra chợ Bến Thành, gần công viên Lê Văn Tám.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Thang máy', 'Bảo vệ', 'Ban công'],
+    contact: { name: 'Hà Thanh Hải', phone: '0901222334' },
+    showPhone: true,
+    latitude: 10.7768,
+    longitude: 106.6941,
+    status: 'active',
+    createdAt: daysAgo(11),
+    rating: 4.6,
+    reviewCount: 9,
+    condition: 'new',
+    views: 7_200,
+    contactCount: 55,
+    savedCount: 131,
+  },
+  {
+    id: 'bds012',
+    title: 'Phòng mới xây Thủ Đức — gần ga Metro, full nội thất',
+    price: 3_400_000,
+    area: 22,
+    districtId: 'thuduc',
+    district: 'Thủ Đức',
+    ward: 'Phường Linh Trung',
+    address: '75 Kha Vạn Cân, Thủ Đức',
+    type: 'phong_tro',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 2,
+    yearBuilt: 2023,
+    description:
+      'Phòng xây mới 100% năm 2023, sàn gỗ, wc kính. Full nội thất: giường, tủ, bàn học, máy lạnh, tủ lạnh mini. Cách ga Metro Kha Vạn Cân 400m, gần ĐH Sư phạm Kỹ thuật. Có camera an ninh, chủ ở ngay nhà.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'WC riêng', 'Nấu ăn', 'Bảo vệ'],
+    contact: { name: 'Trương Văn Kiên', phone: '0356667777' },
+    showPhone: true,
+    latitude: 10.8501,
+    longitude: 106.7642,
+    status: 'active',
+    createdAt: daysAgo(12),
+    rating: 4.7,
+    reviewCount: 13,
+    condition: 'new',
+    views: 2_900,
+    contactCount: 18,
+    savedCount: 43,
+  },
+  {
+    id: 'bds013',
+    title: 'Căn hộ dịch vụ Quận 5 — dọn phòng tuần 2 lần',
+    price: 6_500_000,
+    area: 32,
+    districtId: 'q5',
+    district: 'Quận 5',
+    ward: 'Phường 14',
+    address: '310 An Dương Vương, Quận 5',
+    type: 'can_ho',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 6,
+    yearBuilt: 2020,
+    description:
+      'Căn hộ dịch vụ 32m² kiểu khách sạn: giường king, tv 50 inch, minibar. Dịch vụ gồm: dọn phòng 2 lần/tuần, thay ga giường, WiFi 300Mbps. Quản lý 24/7. Gần chợ Hàn Quốc, bệnh viện Chợ Rẫy, phù hợp chuyên gia và du học sinh.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'TV', 'Thang máy', 'Bảo vệ', 'Giặt ủi'],
+    contact: { name: 'Lý Tấn Phát', phone: '0922223333' },
+    showPhone: false,
+    latitude: 10.7563,
+    longitude: 106.6672,
+    status: 'active',
+    createdAt: daysAgo(13),
+    rating: 4.8,
+    reviewCount: 25,
+    condition: 'new',
+    views: 3_800,
+    contactCount: 27,
+    savedCount: 64,
+  },
+  {
+    id: 'bds014',
+    title: 'Nhà nguyên căn Gò Vấp 2 tầng — hẻn xe hơi, giá tốt',
+    price: 12_000_000,
+    area: 85,
+    districtId: 'govap',
+    district: 'Gò Vấp',
+    ward: 'Phường 10',
+    address: '47 Nguyễn Oanh, Gò Vấp',
+    type: 'nha_nguyen_can',
+    bedrooms: 3,
+    bathrooms: 3,
+    floor: 2,
+    yearBuilt: 2017,
+    description:
+      'Nhà 2 tầng 85m² hẻm xe hơi Nguyễn Oanh. 3 phòng ngủ, 3 wc, bếp rộng, sân trước đậu xe. Gần chợ Nguyễn Oanh, trường THCS. Cho thuê lâu dài, hợp đồng rõ ràng, phù hợp gia đình 5-6 người.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Bếp riêng', 'Ban công'],
+    contact: { name: 'Đỗ Mỹ Linh', phone: '0988999000' },
+    showPhone: true,
+    latitude: 10.8298,
+    longitude: 106.6895,
+    status: 'active',
+    createdAt: daysAgo(14),
+    condition: 'new',
+    views: 9_400,
+    contactCount: 71,
+    savedCount: 156,
+  },
+  {
+    id: 'bds015',
+    title: 'Căn hộ 2PN view công viên Quận 7 — ban công rộng',
+    price: 13_000_000,
+    area: 72,
+    districtId: 'q7',
+    district: 'Quận 7',
+    ward: 'Phường Tân Thuận Đông',
+    address: '8 Nguyễn Văn Linh, Quận 7',
+    type: 'can_ho',
+    bedrooms: 2,
+    bathrooms: 2,
+    floor: 12,
+    yearBuilt: 2021,
+    description:
+      'Căn hộ 72m² view thẳng công viên và hồ cảnh quan. Ban công rộng 6m², phòng bếp mở connected khách. Chung cư mới với hồ bơi resort, gym, khu BBQ. Gần Lotte Mart, trường quốc tế Canada.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'TV', 'Thang máy', 'Bảo vệ', 'Ban công'],
+    contact: { name: 'Cao Gia Bảo', phone: '0933444555', email: 'caogiabao@gmail.com' },
+    showPhone: true,
+    latitude: 10.7439,
+    longitude: 106.7066,
+    status: 'active',
+    createdAt: daysAgo(15),
+    rating: 4.9,
+    reviewCount: 18,
+    condition: 'new',
+    views: 16_800,
+    contactCount: 104,
+    savedCount: 268,
+  },
+  {
+    id: 'bds016',
+    title: 'Phòng trọ sinh viên gần ĐH Công nghiệp — chỉ 2.2 triệu',
+    price: 2_200_000,
+    area: 16,
+    districtId: 'govap',
+    district: 'Gò Vấp',
+    ward: 'Phường 5',
+    address: '159 Lê Đức Thọ, Gò Vấp',
+    type: 'phong_tro',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 1,
+    yearBuilt: 2018,
+    description:
+      'Phòng 16m² giá rẻ dành cho sinh viên, cách ĐH Công nghiệp 600m. Có điều hòa, wc chung sạch, khu nấu ăn chung, WiFi mạnh. Để xe miễn phí, giờ giấc tự do. Tiện mua đồ ăn đêm quanh khu.',
+    amenities: ['WiFi', 'Máy lạnh', 'Nấu ăn'],
+    contact: { name: 'Bùi Hồng Mai', phone: '0917777888' },
+    showPhone: true,
+    latitude: 10.8286,
+    longitude: 106.6497,
+    status: 'active',
+    createdAt: daysAgo(16),
+    rating: 4.2,
+    reviewCount: 6,
+    condition: 'needs_repair',
+    views: 4_100,
+    contactCount: 33,
+    savedCount: 78,
+  },
+  {
+    id: 'bds017',
+    title: 'Penthouse 2 tầng view thành phố Quận 1 — sang trọng bậc nhất',
+    price: 45_000_000,
+    area: 180,
+    districtId: 'q1',
+    district: 'Quận 1',
+    ward: 'Phường Nguyễn Thái Bình',
+    address: '22-36 Nguyễn Huệ, Quận 1',
+    type: 'can_ho',
+    bedrooms: 3,
+    bathrooms: 4,
+    floor: 40,
+    yearBuilt: 2022,
+    description:
+      'Penthouse duplex 180m² trên tầng 40 tòa nhà hạng A mặt Nguyễn Huệ. Sảnh riêng, thang máy thẻ từ, hồ bơi private trên sân thượng. View panorama sông Sài Gòn và Landmark. Phù hợp CEO, gia đình nước ngoài.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'TV', 'Thang máy', 'Bảo vệ', 'Ban công'],
+    contact: { name: 'Simon Trần', phone: '0901111222', email: 'simon.tran@luxuryhome.vn' },
+    showPhone: false,
+    latitude: 10.7742,
+    longitude: 106.7041,
+    status: 'active',
+    createdAt: daysAgo(17),
+    rating: 5.0,
+    reviewCount: 7,
+    condition: 'new',
+    views: 28_900,
+    contactCount: 152,
+    savedCount: 421,
+  },
+  {
+    id: 'bds018',
+    title: 'Nhà nguyên căn Phú Nhuận 2 tầng — sân vườn nhỏ, yên tĩnh',
+    price: 18_000_000,
+    area: 95,
+    districtId: 'phunhuan',
+    district: 'Phú Nhuận',
+    ward: 'Phường 4',
+    address: '35 Hoàng Van Thụ, Phú Nhuận',
+    type: 'nha_nguyen_can',
+    bedrooms: 3,
+    bathrooms: 3,
+    floor: 2,
+    yearBuilt: 2015,
+    description:
+      'Nhà 2 tầng 95m² có sân vườn nhỏ trồng hoa, rất mát mẻ. Phòng khách rộng, bếp đóng gỗ, 3 phòng ngủ đều có điều hòa. Hẻm thông Hoàng Văn Thụ - Nguyễn Văn Trỗi. Gần sân bay, công viên Hoàng Văn Thụ.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'Bếp riêng', 'Ban công'],
+    contact: { name: 'Tôn Nữ Khánh Vy', phone: '0955444333' },
+    showPhone: true,
+    latitude: 10.7975,
+    longitude: 106.6781,
+    status: 'active',
+    createdAt: daysAgo(18),
+    rating: 4.5,
+    reviewCount: 10,
+    condition: 'new',
+    views: 6_200,
+    contactCount: 45,
+    savedCount: 102,
+  },
+  {
+    id: 'bds019',
+    title: 'Căn hộ studio gần RMIT Quận 7 — nội thất kiểu Hàn',
+    price: 7_000_000,
+    area: 33,
+    districtId: 'q7',
+    district: 'Quận 7',
+    ward: 'Phường Phú Mỹ',
+    address: '595 Nguyễn Văn Linh, Quận 7',
+    type: 'can_ho',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 10,
+    yearBuilt: 2022,
+    description:
+      'Studio 33m² phong cách Hàn Quốc: tone trắng kem, rèm che, đèn vàng ấm. Full đồ: bed cao cấp, bàn làm việc, tủ áo, bếp từ, lò vi sóng. Cộng đồng cư dân đa quốc gia, nhiều bạn RMIT thuê. Gần The Crescent, SC VivoCity.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'Máy giặt', 'TV', 'Thang máy', 'Bảo vệ'],
+    contact: { name: 'Park Ji Woo', phone: '0907000111' },
+    showPhone: false,
+    latitude: 10.7297,
+    longitude: 106.6954,
+    status: 'active',
+    createdAt: daysAgo(19),
+    rating: 4.8,
+    reviewCount: 22,
+    condition: 'new',
+    views: 10_600,
+    contactCount: 67,
+    savedCount: 178,
+  },
+  {
+    id: 'bds020',
+    title: 'Phòng trọ tầm trung Tân Bình — gần chợ Bà Chiểu, giá mềm',
+    price: 3_800_000,
+    area: 24,
+    districtId: 'tanbinh',
+    district: 'Tân Bình',
+    ward: 'Phường 2',
+    address: '126 Bạch Đằng, Tân Bình',
+    type: 'phong_tro',
+    bedrooms: 1,
+    bathrooms: 1,
+    floor: 2,
+    yearBuilt: 2020,
+    description:
+      'Phòng 24m² tầng 2, cửa sổ hướng Nam mát quanh năm. Máy lạnh inverter tiết kiệm điện, tủ lạnh, giường gỗ tự nhiên. WC riêng có máy nước nóng. Gần chợ Bà Chiểu và công viên Hoàng Van Thụ, ăn uống đầy đủ.',
+    amenities: ['WiFi', 'Máy lạnh', 'Tủ lạnh', 'WC riêng', 'Nấu ăn'],
+    contact: { name: 'Lâm Chí Cường', phone: '0344445555' },
+    showPhone: true,
+    latitude: 10.8019,
+    longitude: 106.6907,
+    status: 'active',
+    createdAt: daysAgo(20),
+    rating: 4.4,
+    reviewCount: 9,
+    condition: 'new',
+    views: 5_700,
+    contactCount: 39,
+    savedCount: 91,
+  },
+];
+
+async function main(): Promise<void> {
+  console.log(`\nSeed ${ROOMS.length} phòng đẹp → project: ${process.env.GCLOUD_PROJECT ?? '(theo key)'}\n`);
+
+  const batch = db.batch();
+  let fixed = 0;
+  for (const room of ROOMS) {
+    const { id, ...data } = room;
+    const docData = {
+      ...data,
+      images: nextImages(),
+      ownerUid: '',
+      isFavorite: false,
+    };
+    if (!docData.views) delete docData.views;
+    if (!docData.rating) delete docData.rating;
+    batch.set(db.collection('listings').doc(id), docData);
+    fixed++;
+  }
+  await batch.commit();
+  console.log(`✓ listings: ghi ${fixed} phòng (bds001–bds020), giữ nguyên tin demo & tin người dùng`);
+
+  const snap = await db.collection('listings').count().get();
+  console.log(`✓ Tổng số tin hiện có trên Firestore: ${snap.data().count}\n`);
+}
+
+main()
+  .catch((err) => {
+    console.error('\n[!] Seed lỗi:', err);
+    process.exit(1);
+  })
+  .then(() => process.exit(0));

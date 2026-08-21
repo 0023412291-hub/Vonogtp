@@ -9,7 +9,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "seed": "tsx scripts/seed-firestore.ts",
-    "seed:demo": "tsx scripts/seed-demo-users.ts",
+      "seed:demo": "tsx scripts/seed-demo-users.ts",
+      "seed:rooms": "tsx scripts/seed-rooms.ts",
     "push": "tsx scripts/send-push.ts",
     "lint": "expo lint"
   },
