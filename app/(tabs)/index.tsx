@@ -30,7 +30,7 @@ import { SectionHeader } from '@/components/section-header';
 import { VideoCard } from '@/components/video-card';
 import { COLORS, SHADOWS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
-import { DISTRICTS, MOCK_VIDEOS } from '@/data/mock';
+import { DISTRICTS } from '@/data/mock';
 import { PROPERTY_TYPES, type Listing, type PropertyType } from '@/types';
 import { activeFiltersCount, filterListings } from '@/utils/filters';
 import { PRICE_PRESETS } from '@/utils/formatters';
@@ -49,6 +49,7 @@ export default function HomeScreen() {
     listings,
     myListings,
     favorites,
+    videos,
     filters,
     updateFilters,
     toggleFavorite,
@@ -145,7 +146,7 @@ export default function HomeScreen() {
         </View>
         <FlatList
           horizontal
-          data={MOCK_VIDEOS}
+          data={videos}
           keyExtractor={(v) => v.id}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.videoList}

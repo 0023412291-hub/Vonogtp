@@ -33,6 +33,8 @@ export interface Listing {
   contact: ListingContact;
   /** Hiển thị SĐT trên tin hay chỉ liên hệ qua tin nhắn */
   showPhone: boolean;
+  /** UID chủ tin (đặt khi người dùng đăng tin; tin mẫu/seed để trống) */
+  ownerUid?: string;
   /** Số liệu hiệu quả tin đăng (mock): lượt xem, liên hệ, lượt lưu */
   views?: number;
   contactCount?: number;
@@ -47,6 +49,19 @@ export interface Listing {
   condition?: Condition;
 }
 
+/** Thông báo trong app (bản thật lưu trên Firestore collection `notifications`) */
+export interface AppNotification {
+  id: string;
+  /** UID người nhận — mock để trống */
+  uid?: string;
+  role: 'renter' | 'owner' | 'both';
+  icon: string;
+  title: string;
+  body: string;
+  /** Chuỗi hiển thị ("3 giờ trước") — tự tính từ createdAt nếu là bản thật */
+  time: string;
+}
+
 /** Chế độ sử dụng: người tìm thuê/mua (renter) hoặc người đăng tin (owner) */
 export type UserRole = 'renter' | 'owner';
 
@@ -56,6 +71,8 @@ export const USER_ROLES: { value: UserRole; label: string; desc: string; icon: s
 ];
 
 export interface User {
+  /** Firebase Authentication UID (nếu đã liên kết Firebase) */
+  uid?: string;
   name: string;
   phone: string;
   email: string;

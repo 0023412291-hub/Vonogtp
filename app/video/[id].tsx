@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
-import { MOCK_VIDEOS } from '@/data/mock';
 import type { Video } from '@/types';
 import { formatDuration, formatViews } from '@/utils/formatters';
 
@@ -158,9 +157,9 @@ export default function VideoShortsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const { toggleFavorite, isFavorite } = useApp();
+  const { toggleFavorite, isFavorite, videos } = useApp();
 
-  const initialIndex = MOCK_VIDEOS.findIndex((v) => v.id === id);
+  const initialIndex = videos.findIndex((v) => v.id === id);
   const [currentIndex, setCurrentIndex] = useState(() => Math.max(0, initialIndex));
   const listRef = useRef<FlatList<Video>>(null);
 
@@ -173,11 +172,19 @@ export default function VideoShortsScreen() {
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
   const scrollToIndex = useCallback((index: number) => {
-    if (index < 0 || index >= MOCK_VIDEOS.length) return;
+    if (index < 0 || index >= videos.length) return;
     listRef.current?.scrollToIndex({ index, animated: true });
-  }, []);
+  }, [videos.length]);
 
   if (initialIndex === -1) {
+    // Firestore có thể chưa kịp trả dữ liệu — hiển thị đang tải thay vì báo lỗi
+    if (videos.length === 0) {
+      return (
+        <View style={[styles.container, styles.center]}>
+          <Text style={styles.notFound}>Đang tải video...</Text>
+        </View>
+      );
+    }
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { top: insets.top + 8 }]} hitSlop={8}>
@@ -198,7 +205,7 @@ export default function VideoShortsScreen() {
     <View style={styles.container}>
       <FlatList
         ref={listRef}
-        data={MOCK_VIDEOS}
+        data={videos}
         keyExtractor={(v) => v.id}
         pagingEnabled
         showsVerticalScrollIndicator={false}

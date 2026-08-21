@@ -34,7 +34,7 @@ export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getListing, toggleFavorite, isFavorite, trackView } = useApp();
+  const { getListing, toggleFavorite, isFavorite, trackView, contactListing } = useApp();
 
   const [showFullDesc, setShowFullDesc] = useState(false);
 
@@ -66,6 +66,8 @@ export default function ListingDetailScreen() {
   const fav = isFavorite(listing.id);
 
   const handleCall = () => {
+    // Ghi nhận lượt liên hệ + tạo lead cho chủ tin (nếu đủ điều kiện)
+    contactListing(listing);
     if (listing.showPhone) {
       Linking.openURL(`tel:${listing.contact.phone}`).catch(() =>
         Alert.alert('Lỗi', 'Không thể gọi điện trên thiết bị này.'),

@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Hồ sơ user: mỗi người chỉ đọc/ghi hồ sơ của mình
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Tin đăng: ai cũng đọc được.
+    // Tạo tin: phải đăng nhập và gắn đúng uid chủ sở hữu (seed dùng ownerUid rỗng).
+    // Cập nhật: đăng nhập và không đổi chủ sở hữu (cho phép tăng lượt xem).
+    // Xóa: chỉ chủ sở hữu.
+    match /listings/{id} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.ownerUid in [request.auth.uid, ''];
+      allow update: if signedIn()
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+
+    // Yêu thích: mỗi user chỉ đọc/ghi danh sách của mình
+    match /favorites/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Khách quan tâm: lead demo (ownerUid rỗng) ai cũng xem/cập nhật;
+    // lead của user chỉ chủ đó xem/cập nhật.
+    match /leads/{id} {
+      allow read: if resource.data.ownerUid == '' || isOwner(resource.data.ownerUid);
+      allow create: if signedIn();
+      allow update: if resource.data.ownerUid == '' || isOwner(resource.data.ownerUid);
+      allow delete: if false;
+    }
+
+    // Thông báo: người nhận chỉ đọc được thông báo của mình; app tạo mới khi có sự kiện.
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+  }
+}

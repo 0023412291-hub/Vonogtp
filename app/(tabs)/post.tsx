@@ -26,6 +26,7 @@ import { BORDER_RADIUS, COLORS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
 import { DISTRICTS } from '@/data/mock';
 import { AMENITIES, PROPERTY_TYPES, type Condition, type Listing, type PropertyType } from '@/types';
+import { cloudinaryConfigured, uploadImagesToCloudinary } from '@/utils/cloudinary';
 import { formatPriceShort } from '@/utils/formatters';
 import { isValidPhone } from '@/utils/validation';
 
@@ -88,6 +89,8 @@ export default function PostScreen() {
   const [districtPicker, setDistrictPicker] = useState(false);
   const [wardPicker, setWardPicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** Trạng thái upload ảnh lên Cloudinary ("2/5") — hiện trên nút Đăng tin */
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -201,47 +204,59 @@ export default function PostScreen() {
   };
 
   // ---------- Submit ----------
-  const submit = () => {
+  const submit = async () => {
     if (!validateStep(4)) return;
     setSubmitting(true);
-    const price = Number(form.price);
-    const area = Number(form.area);
-    const listingData: Omit<Listing, 'id' | 'createdAt' | 'isFavorite' | 'status'> = {
-      title: form.title.trim(),
-      price,
-      area,
-      districtId: form.districtId,
-      district: district?.name ?? '',
-      ward: form.ward,
-      address: `${form.ward}, ${district?.name ?? ''}`,
-      type: form.type ?? 'phong_tro',
-      bedrooms: form.bedrooms,
-      bathrooms: form.bathrooms,
-      description: form.description.trim(),
-      amenities: [...form.amenities, ...form.customAmenities],
-      images: form.images,
-      contact: {
-        name: form.contactName.trim(),
-        phone: form.contactPhone.trim(),
-        email: form.contactEmail.trim() || undefined,
-      },
-      showPhone: form.showPhone,
-      latitude: 10.7769 + (Math.random() - 0.5) * 0.06,
-      longitude: 106.7009 + (Math.random() - 0.5) * 0.06,
-      condition: form.condition,
-    };
-    // Giả lập độ trễ lưu
-    setTimeout(() => {
-      setSubmitting(false);
+    try {
+      // Ảnh local (chụp/chọn từ máy) phải upload lên Cloudinary để mọi người xem được
+      let images = form.images;
+      if (cloudinaryConfigured() && images.some((u) => !u.startsWith('http'))) {
+        setUploadProgress(`0/${images.length}`);
+        try {
+          images = await uploadImagesToCloudinary(images, (done, total) =>
+            setUploadProgress(`${done}/${total}`),
+          );
+        } finally {
+          setUploadProgress(null);
+        }
+      }
+      const price = Number(form.price);
+      const area = Number(form.area);
+      const listingData: Omit<Listing, 'id' | 'createdAt' | 'isFavorite' | 'status'> = {
+        title: form.title.trim(),
+        price,
+        area,
+        districtId: form.districtId,
+        district: district?.name ?? '',
+        ward: form.ward,
+        address: `${form.ward}, ${district?.name ?? ''}`,
+        type: form.type ?? 'phong_tro',
+        bedrooms: form.bedrooms,
+        bathrooms: form.bathrooms,
+        description: form.description.trim(),
+        amenities: [...form.amenities, ...form.customAmenities],
+        images,
+        contact: {
+          name: form.contactName.trim(),
+          phone: form.contactPhone.trim(),
+          email: form.contactEmail.trim() || undefined,
+        },
+        showPhone: form.showPhone,
+        latitude: 10.7769 + (Math.random() - 0.5) * 0.06,
+        longitude: 106.7009 + (Math.random() - 0.5) * 0.06,
+        condition: form.condition,
+      };
       if (editId) {
-        updateListing(editId, listingData);
+        await updateListing(editId, listingData);
         setSuccessId(editId);
       } else {
-        const created = addListing(listingData);
+        const created = await addListing(listingData);
         setSuccessId(created.id);
       }
       setStep(0);
-    }, 900);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // ---------- Success ----------
@@ -726,7 +741,9 @@ export default function PostScreen() {
           />
         ) : (
           <ActionButton
-            label={isEdit ? 'LƯU THAY ĐỔI' : 'ĐĂNG TIN'}
+            label={
+              uploadProgress ? `ĐANG TẢI ẢNH ${uploadProgress}...` : isEdit ? 'LƯU THAY ĐỔI' : 'ĐĂNG TIN'
+            }
             icon={isEdit ? 'checkmark-circle-outline' : 'hammer-outline'}
             loading={submitting}
             onPress={submit}

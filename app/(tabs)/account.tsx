@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -21,9 +21,11 @@ import { FormField } from '@/components/form-field';
 import { Segmented } from '@/components/segmented';
 import { BORDER_RADIUS, COLORS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
+import { firebaseEnabled } from '@/firebase';
+import { subscribeLeads, subscribeNotifications, updateLeadStatusRemote } from '@/firebase/firestore';
 import { MOCK_LEADS, MOCK_NOTIFICATIONS } from '@/data/mock';
 import type { Lead, LeadStatus } from '@/data/mock';
-import { PROPERTY_TYPES, USER_ROLES } from '@/types';
+import { PROPERTY_TYPES, USER_ROLES, type AppNotification } from '@/types';
 import { activeFiltersCount } from '@/utils/filters';
 import { formatNumber, formatPriceShort, formatViews } from '@/utils/formatters';
 
@@ -79,11 +81,44 @@ export default function AccountScreen() {
   const [editOpen, setEditOpen] = useState(false);
   const [leadsTab, setLeadsTab] = useState<LeadStatus>('new');
   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
+  const [notifs, setNotifs] = useState<AppNotification[]>(MOCK_NOTIFICATIONS);
   const [leadsY, setLeadsY] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const [editName, setEditName] = useState(user?.name ?? '');
   const [editPhone, setEditPhone] = useState(user?.phone ?? '');
   const [editEmail, setEditEmail] = useState(user?.email ?? '');
+
+  // Khách quan tâm: bản real đọc từ Firestore (lead riêng + lead mẫu), Expo Go dùng mock
+  useEffect(() => {
+    if (!firebaseEnabled || !user?.uid) {
+      setLeads(MOCK_LEADS);
+      return;
+    }
+    let active = true;
+    const unsub = subscribeLeads(user.uid, (remote) => {
+      if (active) setLeads(remote);
+    });
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [user?.uid]);
+
+  // Thông báo: bản real đọc từ Firestore theo user, Expo Go dùng mock
+  useEffect(() => {
+    if (!firebaseEnabled || !user?.uid) {
+      setNotifs(MOCK_NOTIFICATIONS);
+      return;
+    }
+    let active = true;
+    const unsub = subscribeNotifications(user.uid, (remote) => {
+      if (active) setNotifs(remote);
+    });
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [user?.uid]);
 
   const activeList = myListings.filter((l) => l.status === 'active');
   const rentedList = myListings.filter((l) => l.status === 'rented');
@@ -123,11 +158,13 @@ export default function AccountScreen() {
     2,
   ).map(([k, n]) => ({ key: k, label: `${k}: ${n} tin` }));
 
-  const notifs = MOCK_NOTIFICATIONS.filter((n) => n.role === 'both' || n.role === activeRole);
-
   /** Cập nhật trạng thái khách quan tâm (Mới → Đã liên hệ → Đã chốt) */
-  const setLeadStatus = (id: string, status: LeadStatus) =>
+  const setLeadStatus = (id: string, status: LeadStatus) => {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    if (firebaseEnabled) {
+      updateLeadStatusRemote(id, status).catch(() => {});
+    }
+  };
 
   /** Cuộn xuống phần khách quan tâm */
   const scrollToLeads = () => scrollRef.current?.scrollTo({ y: leadsY, animated: true });
@@ -489,7 +526,9 @@ export default function AccountScreen() {
         {/* Thông báo */}
         <Text style={styles.sectionLabel}>THÔNG BÁO</Text>
         <View style={styles.notifCard}>
-          {notifs.map((n) => (
+          {notifs
+            .filter((n) => n.role === 'both' || n.role === activeRole)
+            .map((n) => (
             <TouchableOpacity
               key={n.id}
               style={styles.notifRow}

@@ -33,6 +33,11 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Firebase service account files (chứa thông tin nhạy cảm — cấp qua EAS Build secrets)
+google-services.json
+GoogleService-Info.plist
+serviceAccountKey.json
+
 # typescript
 *.tsbuildinfo
 
