@@ -4,6 +4,7 @@
  * Cách dùng:
  *   npm run push -- <uid> "Tiêu đề" "Nội dung"
  *   npm run push -- all "Tiêu đề" "Nội dung"     (gửi cho mọi user có token)
+ *   npm run push -- <uid> "Tiêu đề" "Nội dung" "/listing/<id>"   (bấm push sẽ mở màn hình này)
  *
  * Token lấy từ users/{uid}.fcmTokens — app lưu khi user đăng nhập SĐT và cấp quyền thông báo.
  */
@@ -20,9 +21,9 @@ if (!existsSync(KEY_PATH)) {
   process.exit(1);
 }
 
-const [uidArg, title, body] = process.argv.slice(2);
+const [uidArg, title, body, route] = process.argv.slice(2);
 if (!uidArg || !title) {
-  console.error('Cú pháp: npm run push -- <uid|all> "Tiêu đề" "Nội dung"');
+  console.error('Cú pháp: npm run push -- <uid|all> "Tiêu đề" "Nội dung" [/listing/<id>]');
   process.exit(1);
 }
 
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
   const res = await getMessaging().sendEachForMulticast({
     tokens,
     notification: { title, body: body ?? '' },
+    ...(route ? { data: { route } } : {}),
   });
   console.log(`Đã gửi thành công ${res.successCount}/${tokens.length} thiết bị.`);
   res.responses.forEach((r, i) => {

@@ -86,7 +86,7 @@ export async function ensureSessionSignIn(): Promise<void> {
   try {
     await signInAnonymously(auth);
   } catch {
-    // Anonymous auth chưa bật trên Console — app vẫn chạy, chỉ bỏ qua phần ghi của khách
+    // Lỗi hiếm gặp (mất mạng / provider bị tắt) — app vẫn chạy, chỉ bỏ qua phần ghi của khách
   }
 }
 

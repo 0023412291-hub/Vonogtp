@@ -1,10 +1,12 @@
-import { Stack } from 'expo-router';
+import { Stack, router, useRootNavigationState, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { COLORS } from '@/constants/colors';
 import { AppProvider } from '@/context/app-context';
+import { firebaseEnabled } from '@/firebase';
+import { getInitialPushRoute, onPushOpened } from '@/firebase/messaging';
 
 export const unstable_settings = {
   // Màn hình mở đầu khi khởi động app (expo-router v5+: anchor thay cho initialRouteName)
@@ -12,6 +14,26 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const navState = useRootNavigationState();
+
+  // Bấm push khi app đang chạy nền → mở đúng màn hình theo data.route
+  useEffect(() => {
+    if (!firebaseEnabled) return;
+    return onPushOpened((route) => router.navigate(route as Href));
+  }, []);
+
+  // App được mở từ trạng thái tắt hẳn nhờ bấm push → chờ navigator sẵn sàng rồi điều hướng
+  useEffect(() => {
+    if (!firebaseEnabled || !navState?.key) return;
+    let active = true;
+    getInitialPushRoute().then((route) => {
+      if (active && route) router.navigate(route as Href);
+    });
+    return () => {
+      active = false;
+    };
+  }, [navState?.key]);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppProvider>

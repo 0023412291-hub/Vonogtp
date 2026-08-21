@@ -6,8 +6,10 @@ import {
 } from '@react-native-firebase/firestore';
 import {
   AuthorizationStatus,
+  getInitialNotification,
   getMessaging,
   getToken,
+  onNotificationOpenedApp,
   requestPermission,
 } from '@react-native-firebase/messaging';
 
@@ -33,4 +35,27 @@ export async function registerFcmToken(uid: string): Promise<void> {
     { fcmTokens: arrayUnion(token) },
     { merge: true },
   );
+}
+
+/** Đọc route đích (`data.route`, vd `/listing/abc`) từ payload push — không có thì bỏ qua */
+function extractPushRoute(data?: {[key: string]: string | object}): string | null {
+  const route = data?.route;
+  return typeof route === 'string' && route.startsWith('/') ? route : null;
+}
+
+/**
+ * Bấm push khi app đang chạy nền → trả về route cần mở.
+ * Trả về hàm hủy lắng nghe.
+ */
+export function onPushOpened(handler: (route: string) => void): () => void {
+  return onNotificationOpenedApp(getMessaging(), (message) => {
+    const route = extractPushRoute(message.data);
+    if (route) handler(route);
+  });
+}
+
+/** App được mở từ trạng thái tắt hẳn nhờ bấm push → route cần mở (hoặc null) */
+export async function getInitialPushRoute(): Promise<string | null> {
+  const message = await getInitialNotification(getMessaging());
+  return extractPushRoute(message?.data);
 }

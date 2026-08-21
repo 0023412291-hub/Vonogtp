@@ -132,7 +132,7 @@ Chuyển dữ liệu mock sang **Firestore** (realtime). Khi app chạy bằng d
   - `firebase/messaging.ts` — xin quyền thông báo + lưu FCM token vào `users/{uid}.fcmTokens` (gọi khi đăng nhập SĐT thật / khôi phục session).
   - Collection `notifications/{id}`: `{uid, role, icon, title, body, createdAt}` — rules đã deploy (người nhận chỉ đọc của mình, không sửa/xóa).
   - Khi khách bấm Gọi tạo lead → tự tạo notification cho chủ tin → hiện realtime trong THÔNG BÁO (account.tsx, Expo Go fallback mock).
-  - `scripts/send-push.ts` + `npm run push -- <uid|all> "Tiêu đề" "Nội dung"` — gửi push thật từ máy tính qua firebase-admin.
+  - `scripts/send-push.ts` + `npm run push -- <uid|all> "Tiêu đề" "Nội dung" [/listing/<id>]` — gửi push thật từ máy tính qua firebase-admin. Tham số thứ 4 là route: bấm vào thông báo sẽ mở đúng màn hình đó (`data.route`, xử lý cả app đang nền lẫn app tắt hẳn qua `onPushOpened`/`getInitialPushRoute` trong `_layout.tsx`).
   - iOS thêm `UIBackgroundModes: remote-notification`. Lưu ý: push foreground (app đang mở) không tự hiện banner — cần notifee nếu muốn; push nền/tắt app hiển thị bình thường.
   - **Build preview Android chứa FCM — THÀNH CÔNG (21/08/2026):**
     - Build ID: `0b32fe70-87b6-41df-b95a-9ebdf0dbdd86`
