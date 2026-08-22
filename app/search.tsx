@@ -19,7 +19,7 @@ import { Segmented } from '@/components/segmented';
 import { Stepper } from '@/components/stepper';
 import { BORDER_RADIUS, COLORS, SHADOWS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
-import { HCMC_CENTER, SCHOOLS } from '@/data/mock';
+import { HCMC_CENTER, SCHOOLS } from '@/data/constants';
 import { PROPERTY_TYPES, type Condition, type PropertyType } from '@/types';
 import { filterListings } from '@/utils/filters';
 import { distanceKm, formatDistanceKm, formatPriceShort, PRICE_PRESETS } from '@/utils/formatters';

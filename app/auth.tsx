@@ -18,19 +18,19 @@ import { FormField } from '@/components/form-field';
 import { Segmented } from '@/components/segmented';
 import { COLORS, TYPOGRAPHY } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
-import { firebaseEnabled } from '@/firebase';
 import {
+  authErrorMessage,
   fetchUserProfile,
   formatPhoneVN,
+  normalizeVietnamesePhone,
   saveUserProfile,
-  sendOtp,
-  verifyOtp,
-  type PendingVerification,
+  sendPasswordReset,
+  signInWithEmail,
+  signUpWithEmail,
 } from '@/firebase/auth';
-import { isValidPhone } from '@/utils/validation';
+import { isValidEmail, isValidPhone } from '@/utils/validation';
 
 type Mode = 'login' | 'register';
-type Step = 'phone' | 'otp';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -38,86 +38,87 @@ export default function AuthScreen() {
   const { signIn } = useApp();
 
   const [mode, setMode] = useState<Mode>('login');
-  const [step, setStep] = useState<Step>('phone');
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [pending, setPending] = useState<PendingVerification | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  const requireFirebase = () => {
-    if (firebaseEnabled) return true;
-    Alert.alert(
-      'Cần bản build có Firebase',
-      'Đăng nhập bằng số điện thoại yêu cầu bản development build (EAS Build). Hãy chạy npx eas build --profile development --platform android và cài lên máy.',
-    );
-    return false;
-  };
-
-  const handleSendOtp = async () => {
+  const validate = (): boolean => {
     const e: Record<string, string> = {};
     if (mode === 'register' && !name.trim()) e.name = 'Vui lòng nhập họ tên';
-    if (!isValidPhone(phone)) e.phone = 'Số điện thoại không hợp lệ';
+    if (!isValidEmail(email)) e.email = 'Email không hợp lệ';
+    if (mode === 'register' && phone.trim() && !isValidPhone(phone)) {
+      e.phone = 'Số điện thoại không hợp lệ';
+    }
+    if (password.length < 6) e.password = 'Mật khẩu cần ít nhất 6 ký tự';
+    if (mode === 'register' && confirm !== password) e.confirm = 'Mật khẩu nhập lại chưa khớp';
     setErrors(e);
-    if (Object.keys(e).length > 0) return;
-    if (!requireFirebase()) return;
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) return;
 
     setLoading(true);
     try {
-      const result = await sendOtp(phone);
-      setPending(result);
-      setStep('otp');
+      if (mode === 'register') {
+        // Tạo tài khoản Auth rồi lưu hồ sơ kèm tên + SĐT liên hệ xuống Firestore
+        const uid = await signUpWithEmail({ email, password });
+        await saveUserProfile({
+          uid,
+          name: name.trim(),
+          phone: phone.trim() ? formatPhoneVN(normalizeVietnamesePhone(phone)) : '',
+          email: email.trim(),
+          role: 'renter',
+        });
+        signIn({ uid, name: name.trim(), phone, email: email.trim(), role: 'renter' });
+      } else {
+        // Đăng nhập → nạp hồ sơ từ Firestore vào app
+        const uid = await signInWithEmail(email, password);
+        let profile = await fetchUserProfile(uid);
+        if (!profile) {
+          profile = {
+            uid,
+            name: email.split('@')[0],
+            phone: '',
+            email: email.trim(),
+            role: 'renter',
+          };
+          await saveUserProfile({ ...profile, uid });
+        }
+        signIn(profile);
+      }
+      router.replace('/(tabs)');
     } catch (err) {
-      const msg =
-        err instanceof Error && err.message.includes('invalid')
-          ? 'Số điện thoại không hợp lệ.'
-          : 'Không gửi được mã xác minh. Kiểm tra SĐT và kết nối mạng.';
-      Alert.alert('Lỗi', msg);
+      if (__DEV__) console.warn('[auth] Đăng nhập/đăng ký lỗi chi tiết:', err);
+      Alert.alert(mode === 'register' ? 'Đăng ký thất bại' : 'Đăng nhập thất bại', authErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async () => {
-    if (!pending) return;
-    if (code.trim().length < 6) {
-      setErrors({ code: 'Mã xác minh gồm 6 chữ số' });
+  const handleForgotPassword = () => {
+    if (!isValidEmail(email)) {
+      setErrors({ email: 'Nhập email đã đăng ký để nhận mail đặt lại mật khẩu' });
       return;
     }
-    if (!requireFirebase()) return;
-
-    setLoading(true);
-    try {
-      const { uid, phone: intlPhone } = await verifyOtp(pending.verificationId, code.trim());
-      let profile = await fetchUserProfile(uid);
-      if (!profile) {
-        profile = {
-          uid,
-          name: mode === 'register' && name.trim() ? name.trim() : `Người dùng ${phone.slice(-4)}`,
-          phone: formatPhoneVN(intlPhone),
-          email: '',
-          role: 'renter',
-        };
-        await saveUserProfile({ ...profile, uid });
-      }
-      signIn(profile);
-      router.replace('/(tabs)');
-    } catch {
-      setErrors({ code: 'Mã xác minh không đúng hoặc đã hết hạn' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetToPhone = () => {
-    setStep('phone');
-    setCode('');
-    setErrors({});
-  };
-
-  const socialLogin = (provider: string) => {
-    Alert.alert(provider, `Đăng nhập bằng ${provider} sẽ được kết nối ở phiên bản sau.`);
+    Alert.alert('Đặt lại mật khẩu', `Gửi hướng dẫn đặt lại mật khẩu đến ${email.trim()}?`, [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Gửi',
+        onPress: async () => {
+          try {
+            await sendPasswordReset(email);
+            Alert.alert('Đã gửi', 'Kiểm tra hộp thư (kể cả mục Spam) để đặt lại mật khẩu.');
+          } catch (err) {
+            Alert.alert('Lỗi', authErrorMessage(err));
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -131,7 +132,7 @@ export default function AuthScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <TouchableOpacity onPress={() => (step === 'otp' ? resetToPhone() : router.back())} style={styles.back} hitSlop={8}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.back} hitSlop={8}>
           <Ionicons name="arrow-back" size={22} color={COLORS.darkBrown} />
         </TouchableOpacity>
 
@@ -139,96 +140,94 @@ export default function AuthScreen() {
           <Text style={styles.welcome}>Chào mừng đến với</Text>
           <Text style={styles.appName}>VoNo - Tìm Nhà Nhanh</Text>
           <Text style={styles.sub}>
-            {step === 'phone'
-              ? 'Đăng nhập bằng số điện thoại để khám phá hàng nghìn tin bất động sản'
-              : `Nhập mã xác minh gửi đến ${pending ? formatPhoneVN(pending.phone) : ''}`}
+            {mode === 'login'
+              ? 'Đăng nhập bằng tài khoản để đăng tin, lưu tin yêu thích và quản lý khách quan tâm'
+              : 'Tạo tài khoản miễn phí chỉ với email và mật khẩu'}
           </Text>
         </View>
 
-        {step === 'phone' ? (
-          <>
-            <Segmented
-              options={['Đăng Nhập', 'Đăng Ký']}
-              value={mode === 'login' ? 'Đăng Nhập' : 'Đăng Ký'}
-              onChange={(v) => setMode(v === 'Đăng Nhập' ? 'login' : 'register')}
-              style={styles.segmented}
-            />
+        <Segmented
+          options={['Đăng Nhập', 'Đăng Ký']}
+          value={mode === 'login' ? 'Đăng Nhập' : 'Đăng Ký'}
+          onChange={(v) => {
+            setMode(v === 'Đăng Nhập' ? 'login' : 'register');
+            setErrors({});
+          }}
+          style={styles.segmented}
+        />
 
-            <View style={styles.form}>
-              {mode === 'register' && (
-                <FormField
-                  label="Họ và tên"
-                  required
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Nguyễn Văn A"
-                  error={errors.name}
-                  autoCapitalize="words"
-                />
-              )}
+        <View style={styles.form}>
+          {mode === 'register' && (
+            <>
               <FormField
-                label="Số điện thoại"
+                label="Họ và tên"
                 required
+                value={name}
+                onChangeText={setName}
+                placeholder="Nguyễn Văn A"
+                error={errors.name}
+                autoCapitalize="words"
+              />
+              <FormField
+                label="Số điện thoại liên hệ"
                 value={phone}
                 onChangeText={setPhone}
-                placeholder="0912345678"
+                placeholder="0912345678 (khách sẽ gọi số này)"
                 keyboardType="phone-pad"
                 error={errors.phone}
               />
-
-              <ActionButton
-                label="GỬI MÃ XÁC MINH"
-                loading={loading}
-                onPress={handleSendOtp}
-                style={styles.submit}
-              />
-
-              <View style={styles.divider}>
-                <View style={styles.line} />
-                <Text style={styles.or}>Hoặc</Text>
-                <View style={styles.line} />
-              </View>
-
-              <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialBtn} onPress={() => socialLogin('Google')}>
-                  <Text style={[styles.socialIcon, { color: '#EA4335' }]}>G</Text>
-                  <Text style={styles.socialText}>Google</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.socialBtn} onPress={() => socialLogin('Facebook')}>
-                  <Text style={[styles.socialIcon, { color: '#1877F2' }]}>f</Text>
-                  <Text style={styles.socialText}>Facebook</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.terms}>
-                Bằng cách tiếp tục, bạn đồng ý với{' '}
-                <Text style={styles.termsLink}>Điều khoản sử dụng</Text> và{' '}
-                <Text style={styles.termsLink}>Chính sách bảo mật</Text> của VoNo.
-              </Text>
-            </View>
-          </>
-        ) : (
-          <View style={styles.form}>
+            </>
+          )}
+          <FormField
+            label="Email"
+            required
+            value={email}
+            onChangeText={setEmail}
+            placeholder="ban@email.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            error={errors.email}
+          />
+          <FormField
+            label="Mật khẩu"
+            required
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Ít nhất 6 ký tự"
+            secure
+            error={errors.password}
+          />
+          {mode === 'register' && (
             <FormField
-              label="Mã xác minh (OTP)"
+              label="Nhập lại mật khẩu"
               required
-              value={code}
-              onChangeText={setCode}
-              placeholder="6 chữ số"
-              keyboardType="number-pad"
-              error={errors.code}
+              value={confirm}
+              onChangeText={setConfirm}
+              placeholder="Gõ lại mật khẩu"
+              secure
+              error={errors.confirm}
             />
-            <ActionButton
-              label="XÁC MINH VÀ ĐĂNG NHẬP"
-              loading={loading}
-              onPress={handleVerifyOtp}
-              style={styles.submit}
-            />
-            <TouchableOpacity onPress={handleSendOtp} disabled={loading} style={styles.resend}>
-              <Text style={styles.resendText}>Gửi lại mã</Text>
+          )}
+
+          <ActionButton
+            label={mode === 'login' ? 'ĐĂNG NHẬP' : 'TẠO TÀI KHOẨN'}
+            loading={loading}
+            onPress={handleSubmit}
+            style={styles.submit}
+          />
+
+          {mode === 'login' && (
+            <TouchableOpacity onPress={handleForgotPassword} style={styles.forgot}>
+              <Text style={styles.forgotText}>Quên mật khẩu?</Text>
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </View>
+
+        <Text style={styles.terms}>
+          Bằng cách tiếp tục, bạn đồng ý với{' '}
+          <Text style={styles.termsLink}>Điều khoản sử dụng</Text> và{' '}
+          <Text style={styles.termsLink}>Chính sách bảo mật</Text> của VoNo.
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -273,48 +272,18 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   submit: {
-    marginTop: 4,
+    marginTop: 10,
     paddingVertical: 15,
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginVertical: 22,
+  forgot: {
+    alignSelf: 'center',
+    marginTop: 14,
+    paddingVertical: 6,
   },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: COLORS.border,
-  },
-  or: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  socialBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
-  },
-  socialIcon: {
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  socialText: {
+  forgotText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.darkBrown,
+    fontWeight: '700',
+    color: COLORS.warmGold,
   },
   terms: {
     marginTop: 22,
@@ -326,15 +295,5 @@ const styles = StyleSheet.create({
   termsLink: {
     color: COLORS.warmGold,
     fontWeight: '600',
-  },
-  resend: {
-    marginTop: 18,
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  resendText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.warmGold,
   },
 });

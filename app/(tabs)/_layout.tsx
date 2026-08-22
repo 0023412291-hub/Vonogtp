@@ -67,6 +67,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="messages"
+        options={{
+          title: 'Tin Nhắn',
+          tabBarIcon: tabIcon('chatbubbles', 'chatbubbles-outline'),
+        }}
+      />
+      <Tabs.Screen
         name="account"
         options={{
           title: isOwner ? 'Của Tôi' : 'Tài Khoản',

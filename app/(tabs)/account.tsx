@@ -23,9 +23,7 @@ import { BORDER_RADIUS, COLORS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
 import { firebaseEnabled } from '@/firebase';
 import { subscribeLeads, subscribeNotifications, updateLeadStatusRemote } from '@/firebase/firestore';
-import { MOCK_LEADS, MOCK_NOTIFICATIONS } from '@/data/mock';
-import type { Lead, LeadStatus } from '@/data/mock';
-import { PROPERTY_TYPES, USER_ROLES, type AppNotification } from '@/types';
+import { PROPERTY_TYPES, USER_ROLES, type AppNotification, type Lead, type LeadStatus } from '@/types';
 import { activeFiltersCount } from '@/utils/filters';
 import { formatNumber, formatPriceShort, formatViews } from '@/utils/formatters';
 
@@ -80,18 +78,18 @@ export default function AccountScreen() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [leadsTab, setLeadsTab] = useState<LeadStatus>('new');
-  const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
-  const [notifs, setNotifs] = useState<AppNotification[]>(MOCK_NOTIFICATIONS);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [leadsY, setLeadsY] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const [editName, setEditName] = useState(user?.name ?? '');
   const [editPhone, setEditPhone] = useState(user?.phone ?? '');
   const [editEmail, setEditEmail] = useState(user?.email ?? '');
 
-  // Khách quan tâm: bản real đọc từ Firestore (lead riêng + lead mẫu), Expo Go dùng mock
+  // Khách quan tâm: đọc thật từ Firestore, khách chưa đăng nhập → danh sách rỗng
   useEffect(() => {
     if (!firebaseEnabled || !user?.uid) {
-      setLeads(MOCK_LEADS);
+      setLeads([]);
       return;
     }
     let active = true;
@@ -104,10 +102,10 @@ export default function AccountScreen() {
     };
   }, [user?.uid]);
 
-  // Thông báo: bản real đọc từ Firestore theo user, Expo Go dùng mock
+  // Thông báo: đọc thật từ Firestore theo user, khách chưa đăng nhập → rỗng
   useEffect(() => {
     if (!firebaseEnabled || !user?.uid) {
-      setNotifs(MOCK_NOTIFICATIONS);
+      setNotifs([]);
       return;
     }
     let active = true;

@@ -23,16 +23,26 @@ initializeApp({ credential: cert(JSON.parse(readFileSync(KEY_PATH, 'utf8'))) });
 const db = getFirestore();
 const auth = getAuth();
 
-const DEMO_OWNER = { phone: '+84903000001', display: '0903000001', name: 'Minh Tuấn (Chủ nhà demo)' };
-const DEMO_RENTER = { phone: '+84903000002', display: '0903000002', name: 'Lan Anh (Người thuê demo)' };
+const DEMO_OWNER = {
+  email: 'chunha@vono.demo',
+  password: 'vono123',
+  phone: '0903000001',
+  name: 'Minh Tuấn (Chủ nhà demo)',
+};
+const DEMO_RENTER = {
+  email: 'thuenha@vono.demo',
+  password: 'vono123',
+  phone: '0903000002',
+  name: 'Lan Anh (Người thuê demo)',
+};
 
-/** Tạo hoặc lấy sẵn tài khoản Auth theo SĐT */
-async function ensureAuthUser(phone: string, name: string): Promise<string> {
+/** Tạo hoặc lấy sẵn tài khoản Auth theo email */
+async function ensureAuthUser(email: string, password: string, name: string): Promise<string> {
   try {
-    const existing = await auth.getUserByPhoneNumber(phone);
+    const existing = await auth.getUserByEmail(email);
     return existing.uid;
   } catch {
-    const created = await auth.createUser({ phoneNumber: phone, displayName: name });
+    const created = await auth.createUser({ email, password, displayName: name });
     return created.uid;
   }
 }
@@ -41,25 +51,25 @@ async function main(): Promise<void> {
   console.log('\nTạo tài khoản demo...\n');
 
   // ---- 1) users ----
-  const ownerUid = await ensureAuthUser(DEMO_OWNER.phone, DEMO_OWNER.name);
+  const ownerUid = await ensureAuthUser(DEMO_OWNER.email, DEMO_OWNER.password, DEMO_OWNER.name);
   await db.doc(`users/${ownerUid}`).set({
     uid: ownerUid,
     name: DEMO_OWNER.name,
-    phone: DEMO_OWNER.display,
-    email: '',
+    phone: DEMO_OWNER.phone,
+    email: DEMO_OWNER.email,
     role: 'owner',
   });
-  console.log(`✓ users/${ownerUid} — ${DEMO_OWNER.name}`);
+  console.log(`✓ users/${ownerUid} — ${DEMO_OWNER.name} (${DEMO_OWNER.email})`);
 
-  const renterUid = await ensureAuthUser(DEMO_RENTER.phone, DEMO_RENTER.name);
+  const renterUid = await ensureAuthUser(DEMO_RENTER.email, DEMO_RENTER.password, DEMO_RENTER.name);
   await db.doc(`users/${renterUid}`).set({
     uid: renterUid,
     name: DEMO_RENTER.name,
-    phone: DEMO_RENTER.display,
-    email: '',
+    phone: DEMO_RENTER.phone,
+    email: DEMO_RENTER.email,
     role: 'renter',
   });
-  console.log(`✓ users/${renterUid} — ${DEMO_RENTER.name}`);
+  console.log(`✓ users/${renterUid} — ${DEMO_RENTER.name} (${DEMO_RENTER.email})`);
 
   // ---- 2) listings của chủ nhà demo ----
   const demoListings = [
@@ -85,7 +95,7 @@ async function main(): Promise<void> {
         'https://picsum.photos/seed/vonodemo02/640/420',
         'https://picsum.photos/seed/vonodemo03/640/420',
       ],
-      contact: { name: DEMO_OWNER.name, phone: DEMO_OWNER.display },
+      contact: { name: DEMO_OWNER.name, phone: DEMO_OWNER.phone },
       showPhone: true,
       views: 156,
       contactCount: 7,
@@ -118,7 +128,7 @@ async function main(): Promise<void> {
         'https://picsum.photos/seed/vonodemo04/640/420',
         'https://picsum.photos/seed/vonodemo05/640/420',
       ],
-      contact: { name: DEMO_OWNER.name, phone: DEMO_OWNER.display },
+      contact: { name: DEMO_OWNER.name, phone: DEMO_OWNER.phone },
       showPhone: false,
       views: 342,
       contactCount: 15,
@@ -147,7 +157,7 @@ async function main(): Promise<void> {
         'Nhà 2 tầng 90m², hẻm xe hơi, sân phơi rộng. Đã cho thuê — giữ lại làm ví dụ trạng thái "Đã cho thuê" trên dashboard.',
       amenities: ['WiFi', 'Máy lạnh', 'Bếp riêng', 'Sân phơi'],
       images: ['https://picsum.photos/seed/vonodemo06/640/420'],
-      contact: { name: DEMO_OWNER.name, phone: DEMO_OWNER.display },
+      contact: { name: DEMO_OWNER.name, phone: DEMO_OWNER.phone },
       showPhone: true,
       views: 520,
       contactCount: 31,
@@ -236,8 +246,8 @@ async function main(): Promise<void> {
 
   console.log(`
 Hoàn tất! Giờ Firestore có đủ:
-  users (${ownerUid.slice(0, 6)}…, ${renterUid.slice(0, 6)}…) · listings · favorites · leads · videos · notifications
-Đăng nhập bằng SĐT 0903000001 sẽ thấy dashboard chủ nhà demo đầy đủ.
+  users (${ownerUid.slice(0, 6)}…, ${renterUid.slice(0, 6)}…) · listings · favorites · leads · notifications
+Đăng nhập bằng email ${DEMO_OWNER.email} / mật khẩu ${DEMO_OWNER.password} sẽ thấy dashboard chủ nhà demo đầy đủ.
 `);
 }
 

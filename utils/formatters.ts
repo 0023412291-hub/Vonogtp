@@ -39,6 +39,26 @@ export function formatDate(iso: string | Date): string {
   return `${Math.floor(months / 12)} năm trước`;
 }
 
+/** ISO date → "Vừa xong" / "5 phút trước" / "3 giờ trước" / "2 ngày trước" / ngày cụ thể */
+export function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < MINUTE_MS) return 'Vừa xong';
+  if (diff < HOUR_MS) return `${Math.floor(diff / MINUTE_MS)} phút trước`;
+  if (diff < DAY_MS) return `${Math.floor(diff / HOUR_MS)} giờ trước`;
+  const days = Math.floor(diff / DAY_MS);
+  if (days < 7) return `${days} ngày trước`;
+  return new Date(iso).toLocaleDateString('vi-VN');
+}
+
+/** ISO date → "14:32" (dòng giờ dưới bubble chat) */
+export function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
 /** Khoảng cách km giữa 2 toạ độ (Haversine) */
 export function distanceKm(
   a: { latitude: number; longitude: number },
@@ -61,13 +81,6 @@ function toRad(deg: number): number {
 export function formatDistanceKm(km: number): string {
   if (km < 1) return `${Math.round(km * 1000)}m`;
   return `${km.toFixed(1)}km`;
-}
-
-/** 96 → "1:36" */
-export function formatDuration(totalSec: number): string {
-  const m = Math.floor(totalSec / 60);
-  const s = Math.floor(totalSec % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 /** 12400 → "12.4K", 1500000 → "1.5M" */
