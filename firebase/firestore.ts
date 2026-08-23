@@ -86,13 +86,27 @@ export async function toggleFavoriteRemote(uid: string, listingId: string): Prom
   await setDoc(ref, { listingIds: next }, { merge: true });
 }
 
+/** Loại bỏ các field có giá trị undefined — Firestore từ chối dữ liệu chứa undefined */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) continue;
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      clean[key] = stripUndefined(value as Record<string, unknown>);
+    } else {
+      clean[key] = value;
+    }
+  }
+  return clean as T;
+}
+
 /** Tạo tin mới trên Firestore — trả về id tin vừa tạo */
 export async function addListingRemote(
   data: Omit<Listing, 'id' | 'createdAt' | 'isFavorite' | 'status'>,
   uid: string,
 ): Promise<string> {
   const ref = await addDoc(collection(getFirebaseDb(), 'listings'), {
-    ...data,
+    ...stripUndefined(data as unknown as Record<string, unknown>),
     ownerUid: uid,
     status: 'active',
     isFavorite: false,
@@ -100,13 +114,16 @@ export async function addListingRemote(
     contactCount: 0,
     savedCount: 0,
     createdAt: serverTimestamp(),
-  });
+  }) as { id: string };
   return ref.id;
 }
 
 /** Cập nhật một phần tin đăng trên Firestore */
 export async function updateListingRemote(id: string, partial: Partial<Listing>): Promise<void> {
-  await updateDoc(doc(getFirebaseDb(), 'listings', id), partial as Record<string, unknown>);
+  await updateDoc(
+    doc(getFirebaseDb(), 'listings', id),
+    stripUndefined(partial as unknown as Record<string, unknown>),
+  );
 }
 
 /** Xóa tin đăng trên Firestore */

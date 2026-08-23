@@ -7,7 +7,7 @@ import React, {
   useState,
 } from 'react';
 
-import { firebaseEnabled } from '@/firebase';
+import { getFirebaseAuth } from '@/firebase/app';
 import { ensureSessionSignIn, fetchUserProfile, isAnonymousUser, onAuthStateChange, saveUserProfile, signOutFirebase } from '@/firebase/auth';
 import { registerFcmToken } from '@/firebase/messaging';
 import {
@@ -25,6 +25,13 @@ import {
   updateListingRemote,
 } from '@/firebase/firestore';
 import { DEFAULT_FILTERS, type Filters, type Listing, type User, type UserRole } from '@/types';
+
+/**
+ * Auth + Firestore dùng Firebase JS SDK → luôn bật.
+ * Khai báo cục bộ thay vì import từ '@/firebase' vì barrel đó bị Metro transform
+ * mất lệnh export (firebaseEnabled luôn undefined tại runtime).
+ */
+const firebaseEnabled = true;
 
 export interface GeoPoint {
   latitude: number;
@@ -78,14 +85,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [recentIds, setRecentIds] = useState<string[]>([]);
   /** Tin đã tạo lead trong session này — tránh spam lead khi bấm Gọi nhiều lần */
   const [contactedIds, setContactedIds] = useState<string[]>([]);
+  /** uid session Firebase hiện tại (ẩn danh nếu khách) — dùng làm chủ tin khi khách đăng */
+  const [sessionUid, setSessionUid] = useState<string | null>(null);
 
   // ---- Đồng bộ dữ liệu từ Firestore (JS SDK — chạy cả trong Expo Go) ----
   useEffect(() => {
+    console.log('[session] Effect khởi tạo chạy — firebaseEnabled =', firebaseEnabled);
     if (!firebaseEnabled) return;
     let active = true;
 
     // Có session trước (ẩn danh nếu khách) để ghi/đọc dữ liệu qua được security rules
-    ensureSessionSignIn().catch(() => {});
+    ensureSessionSignIn()
+      .then(() => {
+        if (active) setSessionUid(getFirebaseAuth().currentUser?.uid ?? null);
+      })
+      .catch((err) => {
+        console.warn(
+          '[session] Khởi tạo phiên Firebase lỗi:',
+          (err as { code?: string })?.code ?? '',
+          (err as { message?: string })?.message ?? err,
+        );
+      });
 
     const unsub = subscribeListings(
       (remote) => {
@@ -126,7 +146,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const signOut = useCallback(() => {
     if (firebaseEnabled) {
-      signOutFirebase().catch(() => {});
+      // Đăng xuất rồi lập tức tạo session ẩn danh mới để khách vẫn đăng/ghi được dữ liệu
+      signOutFirebase()
+        .then(() => ensureSessionSignIn())
+        .catch(() => {});
     }
     setUser(null);
   }, []);
@@ -136,6 +159,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     const unsubscribe = onAuthStateChange(async (uid) => {
       if (!active) return;
+      // Luôn ghi lại uid session (kể cả ẩn danh) — khách đăng tin vẫn có chủ sở hữu
+      setSessionUid(uid);
       // Session ẩn danh (khách): giữ quyền ghi dữ liệu nhưng UI coi như chưa đăng nhập
       if (uid && isAnonymousUser()) {
         setUser(null);
@@ -163,6 +188,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const activeRole: UserRole = user?.role ?? 'renter';
 
+  /**
+   * uid dùng khi ghi/so khớp tin: tài khoản thật nếu đã đăng nhập,
+   * ngược lại dùng session ẩn danh để tin của khách cũng lưu lên Firestore.
+   */
+  const writeUid = user?.uid ?? sessionUid;
+
   // ---- Derived: gắn trạng thái yêu thích vào tin, tách tin của user ----
   const listingsWithFav = useMemo(
     () => listings.map((l) => ({ ...l, isFavorite: favorites.includes(l.id) })),
@@ -171,9 +202,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const myListings = useMemo(
     () =>
       firebaseEnabled
-        ? listingsWithFav.filter((l) => l.ownerUid === user?.uid)
+        ? listingsWithFav.filter((l) => l.ownerUid && l.ownerUid === writeUid)
         : myListingsState,
-    [firebaseEnabled, listingsWithFav, user?.uid, myListingsState],
+    [firebaseEnabled, listingsWithFav, writeUid, myListingsState],
   );
 
   const toggleFavorite = useCallback(
@@ -251,17 +282,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (
       data: Omit<Listing, 'id' | 'createdAt' | 'isFavorite' | 'status'>,
     ): Promise<Listing> => {
-      if (firebaseEnabled && user?.uid) {
-        const id = await addListingRemote(data, user.uid);
+      let uid = writeUid;
+      // Session ẩn danh chưa kịp tạo (mở app xong đăng tin ngay) → tạo ngay tại đây
+      if (firebaseEnabled && !uid) {
+        await ensureSessionSignIn().catch((err) => {
+          console.warn('[addListing] Tạo session ẩn danh thất bại:', err);
+        });
+        uid = getFirebaseAuth().currentUser?.uid ?? null;
+        if (uid) setSessionUid(uid);
+        console.log('[addListing] uid sau khi đảm bảo session:', uid ?? 'NULL');
+      }
+      if (firebaseEnabled && uid) {
+        const id = await addListingRemote(data, uid);
         return {
           ...data,
           id,
-          ownerUid: user.uid,
+          ownerUid: uid,
           createdAt: new Date().toISOString(),
           isFavorite: false,
           status: 'active',
         };
       }
+      // Chỉ rơi vào đây khi Firebase thực sự không khả dụng — tin lưu cục bộ (ID dạng bds...)
+      console.warn('[addListing] KHÔNG có session Firebase — tin chỉ lưu trên máy, không lên Firestore');
       const id = `bds${Date.now().toString().slice(-7)}`;
       const listing: Listing = {
         ...data,
@@ -274,7 +317,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setListings((prev) => [listing, ...prev]);
       return listing;
     },
-    [firebaseEnabled, user?.uid],
+    [firebaseEnabled, writeUid],
   );
 
   const deleteListing = useCallback(

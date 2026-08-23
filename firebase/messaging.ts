@@ -1,7 +1,16 @@
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { arrayUnion, doc, setDoc } from 'firebase/firestore';
 
-import { nativeMessagingAvailable } from './index';
 import { getFirebaseDb } from './app';
+
+/**
+ * RNFirebase Messaging cần native code — chỉ khả dụng trong development/production
+ * build (Expo Go có appOwnership === 'expo'). Khai báo cục bộ thay vì import từ
+ * './index' để không phụ thuộc barrel bị lỗi transform.
+ */
+const nativeMessagingAvailable =
+  Platform.OS !== 'web' && Constants.appOwnership !== 'expo';
 
 type FirebaseMessagingModule = typeof import('@react-native-firebase/messaging');
 

@@ -21,11 +21,13 @@ import { FormField } from '@/components/form-field';
 import { Segmented } from '@/components/segmented';
 import { BORDER_RADIUS, COLORS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
-import { firebaseEnabled } from '@/firebase';
 import { subscribeLeads, subscribeNotifications, updateLeadStatusRemote } from '@/firebase/firestore';
 import { PROPERTY_TYPES, USER_ROLES, type AppNotification, type Lead, type LeadStatus } from '@/types';
 import { activeFiltersCount } from '@/utils/filters';
 import { formatNumber, formatPriceShort, formatViews } from '@/utils/formatters';
+
+/** Cờ Firebase luôn bật (JS SDK) — khai báo cục bộ thay vì import barrel '@/firebase' bị lỗi transform */
+const firebaseEnabled = true;
 
 /** Số ngày tối đa một tin đăng hiển thị trước khi xem là "sắp hết hạn" */
 const EXPIRY_DAYS = 25;

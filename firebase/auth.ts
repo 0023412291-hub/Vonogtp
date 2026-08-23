@@ -119,12 +119,33 @@ export function isAnonymousUser(): boolean {
  * Khách chưa đăng nhập → dùng đăng nhập ẩn danh để qua được security rules.
  */
 export async function ensureSessionSignIn(): Promise<void> {
+  console.log('[ensureSessionSignIn] Hàm được gọi');
   const auth = getFirebaseAuth();
-  if (auth.currentUser) return;
+  // Đọc qua hàm để tránh TS narrow currentUser thành null sau kiểm tra ban đầu
+  const readCurrentUser = () => auth.currentUser;
+  if (readCurrentUser()) {
+    console.log('[ensureSessionSignIn] Đã có sẵn currentUser:', readCurrentUser()!.uid);
+    return;
+  }
   try {
-    await signInAnonymously(auth);
-  } catch {
+    // Chống treo vĩnh viễn: quá 10s coi như thất bại để caller biết mà xử lý
+    await Promise.race([
+      signInAnonymously(auth),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('signInAnonymously treo quá 10s')), 10_000),
+      ),
+    ]);
+    console.log(
+      '[ensureSessionSignIn] signInAnonymously hoàn tất — currentUser sau đó:',
+      readCurrentUser()?.uid ?? 'NULL',
+    );
+  } catch (error) {
     // Anonymous auth chưa bật trên Console — app vẫn chạy, chỉ bỏ qua phần ghi của khách
+    console.warn(
+      '[ensureSessionSignIn] Đăng nhập ẩn danh thất bại:',
+      (error as { code?: string })?.code,
+      (error as { message?: string })?.message,
+    );
   }
 }
 

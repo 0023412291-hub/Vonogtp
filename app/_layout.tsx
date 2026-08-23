@@ -6,6 +6,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { COLORS } from '@/constants/colors';
 import { AppProvider } from '@/context/app-context';
 
+console.log('[BOOT] Bundle mới đã load — 20260823-1625');
+
 export const unstable_settings = {
   // Màn hình mở đầu khi khởi động app (expo-router v5+: anchor thay cho initialRouteName)
   anchor: 'splash',

@@ -239,7 +239,8 @@ export default function PostScreen() {
         contact: {
           name: form.contactName.trim(),
           phone: form.contactPhone.trim(),
-          email: form.contactEmail.trim() || undefined,
+          // Firestore không nhận giá trị undefined → dùng chuỗi rỗng khi không nhập
+          email: form.contactEmail.trim() || '',
         },
         showPhone: form.showPhone,
         latitude: 10.7769 + (Math.random() - 0.5) * 0.06,
@@ -254,6 +255,12 @@ export default function PostScreen() {
         setSuccessId(created.id);
       }
       setStep(0);
+    } catch (err) {
+      console.warn('Lưu tin thất bại:', err);
+      Alert.alert(
+        'Không lưu được tin',
+        'Đã có lỗi khi lưu tin lên máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.',
+      );
     } finally {
       setSubmitting(false);
     }

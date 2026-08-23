@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -40,7 +41,7 @@ export default function SearchScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tab?: string; focus?: string }>();
-  const { listings, filters, updateFilters, userLocation } = useApp();
+  const { listings, filters, updateFilters, userLocation, setUserLocation } = useApp();
 
   const [tab, setTab] = useState<SearchTab>(
     params.tab === 'map' ? 'map' : params.tab === 'type' ? 'type' : 'school',
@@ -56,6 +57,33 @@ export default function SearchScreen() {
   const [condition, setCondition] = useState<Condition | null>(filters.condition);
   const [focusId, setFocusId] = useState<string | null>(params.focus ?? null);
   const mapRef = useRef<any>(null);
+
+  // Chưa có vị trí (bỏ qua màn hình cấp quyền / mở lại app) → xin vị trí ngay tại đây
+  useEffect(() => {
+    if (userLocation) return;
+    let active = true;
+    (async () => {
+      try {
+        let perm = await Location.getForegroundPermissionsAsync();
+        if (!perm.granted && perm.canAskAgain) {
+          perm = await Location.requestForegroundPermissionsAsync();
+        }
+        if (!perm.granted || !active) return;
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (active) {
+          setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        }
+      } catch {
+        // Không lấy được vị trí — bản đồ vẫn dùng tâm mặc định
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const school = SCHOOLS.find((s) => s.id === schoolId);
   const schoolMatches = useMemo(() => {
@@ -328,6 +356,8 @@ export default function SearchScreen() {
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFill}
+          showsUserLocation
+          showsMyLocationButton={false}
           initialRegion={{
             latitude: focused?.latitude ?? homeRegion.latitude,
             longitude: focused?.longitude ?? homeRegion.longitude,
