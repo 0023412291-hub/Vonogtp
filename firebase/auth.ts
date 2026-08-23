@@ -128,6 +128,7 @@ export async function ensureSessionSignIn(): Promise<void> {
     return;
   }
   try {
+<<<<<<< HEAD
     // Chống treo vĩnh viễn: quá 10s coi như thất bại để caller biết mà xử lý
     await Promise.race([
       signInAnonymously(auth),
@@ -146,6 +147,11 @@ export async function ensureSessionSignIn(): Promise<void> {
       (error as { code?: string })?.code,
       (error as { message?: string })?.message,
     );
+=======
+    await signInAnonymously(auth);
+  } catch {
+    // Lỗi hiếm gặp (mất mạng / provider bị tắt) — app vẫn chạy, chỉ bỏ qua phần ghi của khách
+>>>>>>> 6401da55dcb4a52b7785da32ccfb9769869d677e
   }
 }
 
