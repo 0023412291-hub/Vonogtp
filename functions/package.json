@@ -1,0 +1,13 @@
+{
+  "name": "vono-functions",
+  "description": "Cloud Functions cho app VoNo (push FCM khi có tin nhắn chat mới)",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.1.0",
+    "firebase-functions": "^6.1.0"
+  }
+}

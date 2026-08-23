@@ -44,6 +44,12 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "VoNo sử dụng vị trí của bạn để gợi ý các tin gần nhất và hiển thị bản đồ chính xác."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/logo.png",
@@ -52,7 +58,6 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-video",
       [
         "expo-build-properties",
         {

@@ -20,6 +20,7 @@ import { RatingStars } from '@/components/rating-stars';
 import { SectionHeader } from '@/components/section-header';
 import { BORDER_RADIUS, COLORS, SHADOWS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
+import { createOrGetConversation } from '@/firebase/chat';
 import type { PropertyType } from '@/types';
 import { formatDate, formatPriceShort } from '@/utils/formatters';
 
@@ -34,9 +35,10 @@ export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { getListing, toggleFavorite, isFavorite, trackView, contactListing } = useApp();
+  const { getListing, toggleFavorite, isFavorite, trackView, contactListing, user } = useApp();
 
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [openingChat, setOpeningChat] = useState(false);
 
   const listing = getListing(id ?? '');
 
@@ -81,6 +83,31 @@ export default function ListingDetailScreen() {
     Share.share({
       message: `${listing.title}\n${formatPriceShort(listing.price)}/tháng • ${listing.area}m² • ${listing.district}\nXem trên VoNo - Tìm Nhà Nhanh`,
     }).catch(() => {});
+  };
+
+  /** Mở (hoặc tạo) hội thoại chat với chủ tin rồi điều hướng sang màn hình chat */
+  const handleChat = () => {
+    if (!user?.uid) {
+      Alert.alert('Cần đăng nhập', 'Đăng nhập để nhắn tin với chủ nhà.', [
+        { text: 'Hủy', style: 'cancel' },
+        { text: 'Đăng nhập', onPress: () => router.push('/auth') },
+      ]);
+      return;
+    }
+    if (!listing.ownerUid) {
+      Alert.alert('Không khả dụng', 'Tin mẫu chưa có chủ đăng — hãy thử với tin thật nhé.');
+      return;
+    }
+    if (listing.ownerUid === user.uid) {
+      Alert.alert('Tin của bạn', 'Bạn không thể tự nhắn tin trên tin mình đăng.');
+      return;
+    }
+    if (openingChat) return;
+    setOpeningChat(true);
+    createOrGetConversation(listing, { ...user, uid: user.uid })
+      .then((cid) => router.push({ pathname: '/chat/[cid]', params: { cid } }))
+      .catch(() => Alert.alert('Lỗi', 'Không mở được hội thoại. Vui lòng thử lại.'))
+      .finally(() => setOpeningChat(false));
   };
 
   const detailItems = [
@@ -177,12 +204,11 @@ export default function ListingDetailScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.contactBtn, styles.chatBtn]}
-                onPress={() =>
-                  Alert.alert('Chat', 'Tính năng chat sẽ được mở ở phiên bản sau.')
-                }
+                onPress={handleChat}
+                disabled={openingChat}
               >
                 <Ionicons name="chatbubble" size={16} color={COLORS.darkBrown} />
-                <Text style={styles.chatBtnText}>Chat</Text>
+                <Text style={styles.chatBtnText}>{openingChat ? 'Đang mở...' : 'Chat'}</Text>
               </TouchableOpacity>
             </View>
           </View>

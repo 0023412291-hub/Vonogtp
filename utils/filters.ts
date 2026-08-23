@@ -1,4 +1,4 @@
-import { SCHOOLS } from '@/data/mock';
+import { SCHOOLS } from '@/data/constants';
 import type { Filters, Listing } from '@/types';
 import { distanceKm } from '@/utils/formatters';
 

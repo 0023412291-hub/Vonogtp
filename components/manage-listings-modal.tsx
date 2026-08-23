@@ -18,18 +18,27 @@ interface ManageListingsModalProps {
   onEdit: (listing: Listing) => void;
   /** Xoá tin (được gọi sau khi đã xác nhận) */
   onDelete: (id: string) => void;
+  /** Đánh dấu tin đã cho thuê (được gọi sau khi đã xác nhận) */
+  onMarkRented: (id: string) => void;
   /** Đăng tin mới (khi danh sách trống) */
   onAdd: () => void;
 }
 
-/** Modal danh sách tin đã đăng: xem, sửa (mở wizard) hoặc xoá tin */
-export function ManageListingsModal({ visible, listings, onClose, onEdit, onDelete, onAdd }: ManageListingsModalProps) {
+/** Modal danh sách tin đã đăng: xem, sửa (mở wizard), xoá hoặc đánh dấu đã cho thuê */
+export function ManageListingsModal({ visible, listings, onClose, onEdit, onDelete, onMarkRented, onAdd }: ManageListingsModalProps) {
   const insets = useSafeAreaInsets();
 
   const confirmDelete = (id: string) => {
     Alert.alert('Xoá tin', 'Bạn có chắc muốn xoá tin này? Hành động không thể hoàn tác.', [
       { text: 'Hủy', style: 'cancel' },
       { text: 'Xoá', style: 'destructive', onPress: () => onDelete(id) },
+    ]);
+  };
+
+  const confirmMarkRented = (id: string) => {
+    Alert.alert('Đánh dấu đã cho thuê', 'Tin sẽ chuyển sang trạng thái "Đã cho thuê" và ngừng tìm khách. Tiếp tục?', [
+      { text: 'Hủy', style: 'cancel' },
+      { text: 'Xác nhận', onPress: () => onMarkRented(id) },
     ]);
   };
 
@@ -65,6 +74,12 @@ export function ManageListingsModal({ visible, listings, onClose, onEdit, onDele
                     </Text>
                   </View>
                   <View style={styles.actions}>
+                    {l.status === 'active' && (
+                      <TouchableOpacity style={styles.rentedBtn} onPress={() => confirmMarkRented(l.id)} hitSlop={4}>
+                        <Ionicons name="checkmark-circle-outline" size={14} color={COLORS.successGreen} />
+                        <Text style={styles.rentedText}>Đã cho thuê</Text>
+                      </TouchableOpacity>
+                    )}
                     <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(l)} hitSlop={4}>
                       <Ionicons name="create-outline" size={14} color={COLORS.darkBrown} />
                       <Text style={styles.editText}>Sửa</Text>
@@ -162,6 +177,23 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 6,
+  },
+  rentedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(42, 157, 143, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(42, 157, 143, 0.35)',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  rentedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.successGreen,
   },
   editBtn: {
     flexDirection: 'row',

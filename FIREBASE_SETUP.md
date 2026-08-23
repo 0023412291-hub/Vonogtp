@@ -1,7 +1,14 @@
 # Firebase Setup — VoNo
 
 Trạng thái tích hợp Firebase cho app **VoNo - Tìm Nhà Nhanh** (Expo SDK 54, React Native).
-Cập nhật: 20/08/2026
+Cập nhật: 22/08/2026
+
+> **⚠️ THAY ĐỔI LỚN 22/08/2026 — Chuyển sang Email + Mật khẩu:**
+> Bỏ đăng nhập SĐT/OTP (tiết kiệm chi phí SMS, đơn giản hơn). Giờ dùng
+> `createUserWithEmailAndPassword` / `signInWithEmailAndPassword` + quên mật khẩu qua email.
+> **Console cần bật thêm:** Authentication → Sign-in method → **Email/Password**.
+> Tài khoản demo mới: `chunha@vono.demo` (chủ nhà) / `thuenha@vono.demo` (người thuê) — mật khẩu `vono123`.
+> SĐT giờ chỉ là **trường liên hệ** trong hồ sơ user/tin đăng. Các mục ghi "Phone Auth" bên dưới là lịch sử.
  
 ## Mục tiêu
 
@@ -29,7 +36,7 @@ Thay thế toàn bộ dữ liệu mock (`data/mock.ts`, `context/app-context.tsx
 "@react-native-firebase/app": "^26.3.0",
 "@react-native-firebase/auth": "^26.3.0",
 "@react-native-firebase/firestore": "^26.3.0",
-"@react-native-firebase/storage": "^26.3.0",
+"@react-native-firebase/messaging": "^26.3.0",
 "expo-build-properties": "~1.0.10",
 "expo-dev-client": "~6.0.21",
 "eas-cli": "^22.0.0"
@@ -126,9 +133,9 @@ Chuyển dữ liệu mock sang **Firestore** (realtime). Khi app chạy bằng d
 - `firebase deploy --only firestore:rules` ✅ — CLI đồng thời tự tạo Firestore database (default) vì trước đó project CHƯA có database → dữ liệu chưa từng lưu thật lên cloud. Mở app lần nữa sẽ tự seed lên DB mới.
 - **Fix seed bị rules chặn**: rules yêu cầu `signedIn()` mà seed chạy khi khách chưa đăng nhập → thêm **đăng nhập ẩn danh** (`ensureSessionSignIn` trong `firebase/auth.ts`): khách có session để seed/tăng views qua được rules nhưng UI vẫn hiện "Khách". ⚠️ Đã bật Anonymous provider trên Console (bắt buộc).
 - **Analytics thật**: `savedCount` tăng khi bấm Lưu tin (`incrementListingSaves`), contactCount tăng khi bấm Gọi.
-- **Script seed từ máy tính**: `scripts/seed-firestore.ts` + `npm run seed` (dùng `firebase-admin` + `serviceAccountKey.json` ở thư mục gốc, đã gitignore). Đã chạy thành công: **14 listings + 5 leads + 6 videos** đang nằm trên Firestore. Lệnh `npm run seed -- --force` xóa rồi nạp lại.
+- **Script seed từ máy tính**: `scripts/seed-firestore.ts` + `npm run seed` (dùng `firebase-admin` + `serviceAccountKey.json` ở thư mục gốc, đã gitignore). Đã chạy thành công: **14 listings + 5 leads** đang nằm trên Firestore. Lệnh `npm run seed -- --force` xóa rồi nạp lại.
 - **Dữ liệu demo đủ 6 collection**: `scripts/seed-demo-users.ts` + `npm run seed:demo` — tạo 2 tài khoản Auth thật (SĐT `0903000001` chủ nhà demo / `0903000002` người thuê demo) + hồ sơ users, 3 tin của chủ demo, 3 leads, 3 notifications, favorites. Đăng nhập SĐT `0903000001` là thấy dashboard đầy đủ. ⚠️ Ai có SĐT này đều OTP vào được tài khoản demo.
-- **Videos đọc Firestore**: ĐÃ LÀM ✅ (21/08/2026) — thêm `subscribeVideos` + state `videos` trong context (realtime, Expo Go fallback mock). Trang chủ và màn xem video dùng dữ liệu Firestore; màn video có trạng thái "Đang tải" khi list chưa về.
+- **Videos**: ĐÃ GỠ BỎ (22/08/2026) — tính năng "Xem nhà trực quan" bị loại khỏi app (màn `app/video/[id]`, `VideoCard`, `subscribeVideos`, seed collection). Collection `videos` cũ trên Firestore không còn được dùng — có thể xóa thủ công trong Console.
 - **FCM Push**: ĐÃ LÀM CODE ✅ (21/08/2026), CHỜ BUILD LẠI APP ĐỂ TEST:
   - Cài `@react-native-firebase/messaging@26.3.0` (native mới → phải build lại APK/IPA).
   - `firebase/messaging.ts` — xin quyền thông báo + lưu FCM token vào `users/{uid}.fcmTokens` (gọi khi đăng nhập SĐT thật / khôi phục session).

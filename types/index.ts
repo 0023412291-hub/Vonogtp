@@ -65,6 +65,45 @@ export interface AppNotification {
 /** Chế độ sử dụng: người tìm thuê/mua (renter) hoặc người đăng tin (owner) */
 export type UserRole = 'renter' | 'owner';
 
+/** Trạng thái xử lý khách quan tâm tin đăng */
+export type LeadStatus = 'new' | 'contacted' | 'closed';
+
+/** Khách quan tâm tin đăng (lưu thật trên Firestore collection `leads`) */
+export interface Lead {
+  id: string;
+  name: string;
+  phone: string;
+  /** Tin mà khách quan tâm */
+  listingId: string;
+  message: string;
+  status: LeadStatus;
+  time: string;
+}
+
+/** Tin nhắn trong hội thoại chat giữa người thuê và chủ tin */
+export interface ChatMessage {
+  id: string;
+  senderUid: string;
+  text: string;
+  /** ISO string (chuẩn hóa từ Firestore Timestamp) */
+  createdAt: string;
+  status: 'sent' | 'seen';
+}
+
+/** Hội thoại 1-1 gắn với một tin đăng */
+export interface Conversation {
+  id: string;
+  participants: string[];
+  listingId?: string;
+  listingTitle?: string;
+  /** Tên hiển thị của từng thành viên theo uid — denormalize để inbox không cần join users/ */
+  memberInfo: Record<string, { name: string }>;
+  lastMessage: { text: string; senderUid: string; createdAt: string };
+  /** Số tin chưa đọc theo từng uid */
+  unread: Record<string, number>;
+  createdAt: string;
+}
+
 export const USER_ROLES: { value: UserRole; label: string; desc: string; icon: string }[] = [
   { value: 'renter', label: 'Tìm Nhà', desc: 'Xem, lọc và lưu tin phù hợp nhu cầu', icon: 'search-outline' },
   { value: 'owner', label: 'Đăng Tin', desc: 'Đăng và quản lý tin của bạn', icon: 'megaphone-outline' },
@@ -77,19 +116,6 @@ export interface User {
   phone: string;
   email: string;
   role: UserRole;
-}
-
-/** Video xem nhà trực quan (tour ảo) */
-export interface Video {
-  id: string;
-  title: string;
-  thumbnail: string;
-  videoUrl: string;
-  /** Độ dài video (giây) */
-  durationSec: number;
-  views: number;
-  /** Tin bất động sản liên quan (nếu có) */
-  listingId?: string;
 }
 
 export interface School {

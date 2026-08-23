@@ -16,7 +16,7 @@ import { resolve } from 'node:path';
 import { cert, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-import { MOCK_LEADS, MOCK_LISTINGS, MOCK_VIDEOS } from '../data/mock';
+import { SAMPLE_LEADS, SAMPLE_LISTINGS } from './sample-data';
 
 const KEY_PATH = resolve(process.cwd(), 'serviceAccountKey.json');
 const FORCE = process.argv.includes('--force');
@@ -65,33 +65,25 @@ async function main(): Promise<void> {
 
   if (FORCE) {
     console.log('--force: xóa dữ liệu cũ...');
-    await Promise.all([clear('listings'), clear('leads'), clear('videos')]);
+    await Promise.all([clear('listings'), clear('leads')]);
   }
 
   // Tin đăng — ownerUid rỗng = tin mẫu công khai
   const listingBatch = db.batch();
-  for (const listing of MOCK_LISTINGS) {
+  for (const listing of SAMPLE_LISTINGS) {
     const { isFavorite: _drop, ...data } = listing;
     listingBatch.set(db.collection('listings').doc(listing.id), { ...data, ownerUid: '' });
   }
   await listingBatch.commit();
-  console.log(`✓ listings: ${MOCK_LISTINGS.length} tin`);
+  console.log(`✓ listings: ${SAMPLE_LISTINGS.length} tin`);
 
   // Khách quan tâm mẫu
   const leadBatch = db.batch();
-  for (const lead of MOCK_LEADS) {
+  for (const lead of SAMPLE_LEADS) {
     leadBatch.set(db.collection('leads').doc(lead.id), { ...lead, ownerUid: '' });
   }
   await leadBatch.commit();
-  console.log(`✓ leads: ${MOCK_LEADS.length} khách`);
-
-  // Video tour
-  const videoBatch = db.batch();
-  for (const video of MOCK_VIDEOS) {
-    videoBatch.set(db.collection('videos').doc(video.id), video);
-  }
-  await videoBatch.commit();
-  console.log(`✓ videos: ${MOCK_VIDEOS.length} video`);
+  console.log(`✓ leads: ${SAMPLE_LEADS.length} khách`);
 
   console.log('\nSeed hoàn tất! Mở app là thấy dữ liệu ngay.\n');
 }

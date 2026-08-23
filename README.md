@@ -1,50 +1,46 @@
-# Welcome to your Expo app 👋
+# VoNo - Tìm Nhà Nhanh
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Ứng dụng tìm & đăng tin thuê nhà tại TP.HCM dành cho sinh viên.
+Công nghệ: **Expo SDK 54** (React Native + Expo Router) · **Firebase** (`@react-native-firebase`: Auth OTP, Firestore, FCM) · **Cloudinary** (ảnh tin đăng).
 
-## Get started
+## Tính năng
 
-1. Install dependencies
+- Duyệt tin dạng lưới/danh sách realtime (Firestore), lọc giá/quận/loại hình/khoảng cách tới trường
+- Tìm kiếm trên bản đồ (`react-native-maps`)
+- Chi tiết tin, liên hệ chủ nhà (tạo lead + thông báo), yêu thích, lịch sử xem
+- Đăng tin kèm ảnh (upload Cloudinary), quản lý tin: xóa / đánh dấu đã cho thuê
+- Đăng nhập/đăng ký bằng **email + mật khẩu** (Firebase Email Auth, có quên mật khẩu); trong Expo Go dùng "tài khoản dùng thử"
+- Push notification FCM — token lưu tại `users/{uid}.fcmTokens`
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Chạy dự án
 
 ```bash
-npm run reset-project
+npm install
+npm start                # Expo Go — dữ liệu mock + tài khoản dùng thử
+npx expo start --tunnel  # kết nối dev build (APK) trên điện thoại thật
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Bản **dev/preview build** (APK Android) chứa Firebase thật: OTP, Firestore, FCM.
+Chi tiết cấu hình Firebase / EAS Build xem [FIREBASE_SETUP.md](./FIREBASE_SETUP.md).
 
-## Learn more
+## Cấu trúc thư mục
 
-To learn more about developing your project with Expo, look at the following resources:
+| Thư mục | Nội dung |
+|---|---|
+| `app/` | Màn hình (expo-router): `(tabs)`, `auth`, `post`, `listing/[id]`, `search`, `settings`, `terms`, `support`, onboarding |
+| `components/` | UI dùng chung (card, form, modal...) |
+| `context/` | `AppContext` — trạng thái toàn cục, đồng bộ Firestore/mock |
+| `firebase/` | Service layer: `auth.ts`, `firestore.ts`, `messaging.ts`, cờ `firebaseEnabled` |
+| `data/` | Dữ liệu mock cho chế độ Expo Go/web |
+| `types/`, `utils/`, `constants/` | Kiểu dữ liệu, helper (cloudinary, filters, formatters), màu sắc |
+| `scripts/` | `seed-firestore.ts`, `seed-demo-users.ts`, `send-push.ts` |
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Scripts hữu ích
 
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npm run seed                          # nạp dữ liệu mẫu lên Firestore (cần serviceAccountKey.json)
+npm run seed -- --force               # xóa và nạp lại
+npm run seed:demo                     # tạo 2 tài khoản demo: chunha@vono.demo / thuenha@vono.demo (mật khẩu vono123)
+npm run push -- <uid|all> "Tiêu đề" "Nội dung"   # gửi push FCM từ máy tính
+npm run lint && npx tsc --noEmit      # kiểm tra chất lượng code
+```

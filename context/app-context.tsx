@@ -19,15 +19,12 @@ import {
   incrementListingSaves,
   incrementListingViews,
   markRentedRemote,
-  seedFirestoreDataIfEmpty,
   subscribeFavorites,
   subscribeListings,
-  subscribeVideos,
   toggleFavoriteRemote,
   updateListingRemote,
 } from '@/firebase/firestore';
-import { MOCK_LISTINGS, MOCK_VIDEOS } from '@/data/mock';
-import { DEFAULT_FILTERS, type Filters, type Listing, type User, type UserRole, type Video } from '@/types';
+import { DEFAULT_FILTERS, type Filters, type Listing, type User, type UserRole } from '@/types';
 
 export interface GeoPoint {
   latitude: number;
@@ -38,8 +35,6 @@ interface AppContextValue {
   listings: Listing[];
   myListings: Listing[];
   favorites: string[];
-  /** Video tour nhà — realtime từ Firestore (Expo Go dùng mock) */
-  videos: Video[];
   user: User | null;
   /** Chế độ đang dùng: mặc định renter khi chưa đăng nhập hoặc chưa chọn */
   activeRole: UserRole;
@@ -73,10 +68,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [listings, setListings] = useState<Listing[]>(() =>
-    firebaseEnabled ? [] : MOCK_LISTINGS,
-  );
-  const [videos, setVideos] = useState<Video[]>(() => (firebaseEnabled ? [] : MOCK_VIDEOS));
+  const [listings, setListings] = useState<Listing[]>([]);
   const [myListingsState, setMyListingsState] = useState<Listing[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -87,15 +79,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   /** Tin đã tạo lead trong session này — tránh spam lead khi bấm Gọi nhiều lần */
   const [contactedIds, setContactedIds] = useState<string[]>([]);
 
-  // ---- Đồng bộ dữ liệu từ Firestore (chỉ khi chạy bằng dev/preview build) ----
+  // ---- Đồng bộ dữ liệu từ Firestore (JS SDK — chạy cả trong Expo Go) ----
   useEffect(() => {
     if (!firebaseEnabled) return;
     let active = true;
 
-    // Có session trước (ẩn danh nếu khách) để seed/ghi dữ liệu qua được security rules
-    ensureSessionSignIn()
-      .then(() => seedFirestoreDataIfEmpty())
-      .catch(() => {});
+    // Có session trước (ẩn danh nếu khách) để ghi/đọc dữ liệu qua được security rules
+    ensureSessionSignIn().catch(() => {});
 
     const unsub = subscribeListings(
       (remote) => {
@@ -103,24 +93,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
       (error) => {
         if (__DEV__) console.warn('Firestore listings error:', error);
-      },
-    );
-    return () => {
-      active = false;
-      unsub();
-    };
-  }, []);
-
-  // Video tour nhà — realtime từ Firestore
-  useEffect(() => {
-    if (!firebaseEnabled) return;
-    let active = true;
-    const unsub = subscribeVideos(
-      (remote) => {
-        if (active) setVideos(remote);
-      },
-      (error) => {
-        if (__DEV__) console.warn('Firestore videos error:', error);
       },
     );
     return () => {
@@ -364,7 +336,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       listings: listingsWithFav,
       myListings,
       favorites,
-      videos,
       user,
       activeRole,
       filters,
@@ -392,7 +363,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       listingsWithFav,
       myListings,
       favorites,
-      videos,
       user,
       activeRole,
       filters,

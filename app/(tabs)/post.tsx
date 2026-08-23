@@ -24,7 +24,7 @@ import { Stepper } from '@/components/stepper';
 import { StepProgress } from '@/components/step-progress';
 import { BORDER_RADIUS, COLORS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
-import { DISTRICTS } from '@/data/mock';
+import { DISTRICTS } from '@/data/constants';
 import { AMENITIES, PROPERTY_TYPES, type Condition, type Listing, type PropertyType } from '@/types';
 import { cloudinaryConfigured, uploadImagesToCloudinary } from '@/utils/cloudinary';
 import { formatPriceShort } from '@/utils/formatters';

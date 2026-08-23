@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   Dimensions,
   Easing,
@@ -27,10 +26,9 @@ import { ManageListingsModal } from '@/components/manage-listings-modal';
 import { PickerModal, type PickerOption } from '@/components/picker-modal';
 import { SearchBar } from '@/components/search-bar';
 import { SectionHeader } from '@/components/section-header';
-import { VideoCard } from '@/components/video-card';
 import { COLORS, SHADOWS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
-import { DISTRICTS } from '@/data/mock';
+import { DISTRICTS } from '@/data/constants';
 import { PROPERTY_TYPES, type Listing, type PropertyType } from '@/types';
 import { activeFiltersCount, filterListings } from '@/utils/filters';
 import { PRICE_PRESETS } from '@/utils/formatters';
@@ -49,11 +47,11 @@ export default function HomeScreen() {
     listings,
     myListings,
     favorites,
-    videos,
     filters,
     updateFilters,
     toggleFavorite,
     deleteListing,
+    markRented,
     user,
     activeRole,
     signOut,
@@ -126,6 +124,8 @@ export default function HomeScreen() {
     router.push({ pathname: '/(tabs)/post', params: { editId: l.id } });
   };
   const handleDeleteListing = (id: string) => deleteListing(id);
+  /** Đánh dấu tin đã cho thuê — ngừng hiển thị tìm khách nhưng giữ lại tin */
+  const handleMarkRented = (id: string) => markRented(id);
   const handleAddFromManage = () => {
     setManageOpen(false);
     router.push('/(tabs)/post');
@@ -137,28 +137,10 @@ export default function HomeScreen() {
     closePicker();
   };
 
-  /** Section video xem nhà trực quan — lướt ngang, nằm trên danh sách card */
-  const renderVideoSection = () => (
-    <View>
-      <View style={styles.videoSection}>
-        <View style={styles.videoHeader}>
-          <SectionHeader title="Xem nhà trực quan" />
-        </View>
-        <FlatList
-          horizontal
-          data={videos}
-          keyExtractor={(v) => v.id}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.videoList}
-          renderItem={({ item }) => (
-            <VideoCard video={item} onPress={() => router.push(`/video/${item.id}`)} />
-          )}
-        />
-      </View>
-      {/* Header cho phần danh sách card bên dưới */}
-      <View style={styles.gridHeader}>
-        <SectionHeader title="Tin đăng mới nhất" />
-      </View>
+  /** Header cho phần danh sách card bên dưới */
+  const renderGridHeader = () => (
+    <View style={styles.gridHeader}>
+      <SectionHeader title="Tin đăng mới nhất" />
     </View>
   );
 
@@ -199,7 +181,7 @@ export default function HomeScreen() {
         )}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
-        ListHeaderComponent={renderVideoSection}
+        ListHeaderComponent={renderGridHeader}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.warmGold} />}
         ListFooterComponent={
           visibleCount < filtered.length ? (
@@ -214,9 +196,9 @@ export default function HomeScreen() {
 
   /** Menu điều hướng: cài đặt, hỗ trợ, điều khoản và các chức năng khác */
   const menuItems = [
-    { icon: 'settings-outline' as const, label: 'Cài đặt', action: () => Alert.alert('Cài đặt', 'Sắp ra mắt.') },
-    { icon: 'headset-outline' as const, label: 'Liên hệ hỗ trợ', action: () => Alert.alert('Hỗ trợ', 'hotro@vono.app • 1900 1234') },
-    { icon: 'document-text-outline' as const, label: 'Điều khoản & Chính sách', action: () => Alert.alert('Điều khoản', 'Xem đầy đủ tại vono.app/terms') },
+    { icon: 'settings-outline' as const, label: 'Cài đặt', action: () => router.push('/settings') },
+    { icon: 'headset-outline' as const, label: 'Liên hệ hỗ trợ', action: () => router.push('/support') },
+    { icon: 'document-text-outline' as const, label: 'Điều khoản & Chính sách', action: () => router.push('/terms') },
     {
       icon: 'share-social-outline' as const,
       label: 'Chia sẻ ứng dụng',
@@ -550,6 +532,7 @@ export default function HomeScreen() {
         onClose={closeManage}
         onEdit={handleEditListing}
         onDelete={handleDeleteListing}
+        onMarkRented={handleMarkRented}
         onAdd={handleAddFromManage}
       />
     </View>
@@ -742,20 +725,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 24,
   },
-  videoSection: {
-    marginHorizontal: -8,
-    marginBottom: 6,
-  },
-  videoHeader: {
-    paddingHorizontal: 8,
-  },
   gridHeader: {
     paddingHorizontal: 8,
     marginTop: 10,
-  },
-  videoList: {
-    paddingHorizontal: 8,
-    gap: 10,
   },
   gridRow: {
     justifyContent: 'space-between',

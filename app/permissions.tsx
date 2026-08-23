@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
@@ -20,12 +20,36 @@ export default function PermissionsScreen() {
   const [step, setStep] = useState<Step>('notifications');
   const [busy, setBusy] = useState(false);
 
+  /**
+   * Khách đã từ chối quyền vĩnh viễn trên máy → hộp thoại hệ điều hành sẽ
+   * KHÔNG bao giờ hiện lại nữa. Bắt buộc đưa họ vào Cài đặt để bật thủ công.
+   */
+  const promptOpenSettings = (title: string, message: string, onNext: () => void) => {
+    Alert.alert(title, message, [
+      { text: 'Để sau', style: 'cancel', onPress: onNext },
+      { text: 'Mở Cài đặt', onPress: () => void Linking.openSettings() },
+    ]);
+  };
+
   const allowNotifications = async () => {
     setBusy(true);
     try {
-      await Notifications.requestPermissionsAsync();
+      let status = await Notifications.getPermissionsAsync();
+      // Chưa cấp nhưng vẫn có thể hỏi → bung hộp thoại quyền của hệ điều hành
+      if (!status.granted && status.canAskAgain) {
+        status = await Notifications.requestPermissionsAsync();
+      }
+      if (!status.granted && !status.canAskAgain) {
+        setBusy(false);
+        promptOpenSettings(
+          'Thông báo đang bị tắt',
+          'Bạn đã từ chối quyền thông báo trên điện thoại. Hãy bật lại trong Cài đặt để không bỏ lỡ tin mới phù hợp.',
+          () => setStep('location'),
+        );
+        return;
+      }
     } catch {
-      // Người dùng từ chối hoặc thiết bị không hỗ trợ — vẫn tiếp tục
+      // Thiết bị không hỗ trợ — vẫn tiếp tục
     }
     setBusy(false);
     setStep('location');
@@ -34,9 +58,24 @@ export default function PermissionsScreen() {
   const allowLocation = async () => {
     setBusy(true);
     try {
-      const perm = await Location.requestForegroundPermissionsAsync();
+      let perm = await Location.getForegroundPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) {
+        perm = await Location.requestForegroundPermissionsAsync();
+      }
+      if (!perm.granted && !perm.canAskAgain) {
+        setBusy(false);
+        promptOpenSettings(
+          'Vị trí đang bị tắt',
+          'Bạn đã từ chối quyền vị trí trên điện thoại. Hãy bật trong Cài đặt để xem chính xác các tin gần bạn nhất.',
+          () => setStep('done'),
+        );
+        return;
+      }
       if (perm.granted) {
-        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        // Lấy tọa độ chính xác cao ngay khi được cấp quyền
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
         setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
       }
     } catch {

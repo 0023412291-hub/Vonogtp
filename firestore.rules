@@ -46,5 +46,26 @@ service cloud.firestore {
       allow create: if signedIn();
       allow update, delete: if false;
     }
+
+    // Chat: hội thoại 1-1 giữa người thuê và chủ tin.
+    // Chỉ thành viên trong participants mới đọc/ghi được doc hội thoại và tin nhắn bên trong.
+    match /conversations/{cid} {
+      allow create: if signedIn()
+        && request.resource.data.participants.size() == 2
+        && request.auth.uid in request.resource.data.participants;
+      allow read, update: if signedIn() && request.auth.uid in resource.data.participants;
+      allow delete: if false;
+
+      match /messages/{mid} {
+        function isConversationParticipant() {
+          return signedIn()
+            && request.auth.uid in get(/databases/$(database)/documents/conversations/$(cid)).data.participants;
+        }
+        allow read: if isConversationParticipant();
+        allow create: if isConversationParticipant()
+          && request.resource.data.senderUid == request.auth.uid;
+        allow update, delete: if false; // tin nhắn bất biến
+      }
+    }
   }
 }
