@@ -4,6 +4,34 @@ export type ListingStatus = 'active' | 'rented';
 
 export type Condition = 'new' | 'needs_repair';
 
+/** Hình thức giao dịch: cho thuê hoặc bán */
+export type DealType = 'rent' | 'sale';
+
+/** Hướng nhà/đất (tính theo hướng cửa chính) */
+export const DIRECTIONS = [
+  'Đông',
+  'Tây',
+  'Nam',
+  'Bắc',
+  'Đông Bắc',
+  'Đông Nam',
+  'Tây Bắc',
+  'Tây Nam',
+] as const;
+export type Direction = (typeof DIRECTIONS)[number];
+
+/** Giấy tờ pháp lý của bất động sản */
+export const LEGALS = ['Sổ hồng', 'Sổ đỏ', 'Hợp đồng mua bán', 'Giấy tờ khác'] as const;
+export type Legal = (typeof LEGALS)[number];
+
+/** Mức độ nội thất đã trang bị sẵn */
+export const FURNISHED_OPTIONS: { value: 'full' | 'basic' | 'none'; label: string }[] = [
+  { value: 'full', label: 'Đầy đủ nội thất' },
+  { value: 'basic', label: 'Nội thất cơ bản' },
+  { value: 'none', label: 'Không nội thất' },
+];
+export type Furnished = 'full' | 'basic' | 'none';
+
 export interface ListingContact {
   name: string;
   phone: string;
@@ -27,6 +55,16 @@ export interface Listing {
   bathrooms: number;
   floor?: number;
   yearBuilt?: number;
+  /** Bán hay cho thuê (mặc định cho thuê khi seed/loại cũ) */
+  deal?: DealType;
+  /** Hướng cửa chính (căn hộ / nhà / đất nền) */
+  direction?: Direction;
+  /** Pháp lý (thường áp dụng với tin bán) */
+  legal?: Legal;
+  /** Mặt tiền (m) */
+  frontage?: number;
+  /** Mức độ nội thất đã trang bị */
+  furnished?: Furnished;
   description: string;
   amenities: string[];
   images: string[];
@@ -143,6 +181,12 @@ export interface Filters {
   condition: Condition | null;
   schoolId: string | null;
   maxDistanceKm: number | null;
+  /** Hình thức: bán / cho thuê / null = tất cả */
+  deal: DealType | null;
+  /** Bộ lọc hướng */
+  directions: Direction[];
+  /** Bộ lọc pháp lý (áp dụng với tin bán) */
+  legals: Legal[];
 }
 
 export const DEFAULT_FILTERS: Filters = {
@@ -156,6 +200,9 @@ export const DEFAULT_FILTERS: Filters = {
   condition: null,
   schoolId: null,
   maxDistanceKm: null,
+  deal: null,
+  directions: [],
+  legals: [],
 };
 
 export const PROPERTY_TYPES: { value: PropertyType; label: string; icon: string }[] = [

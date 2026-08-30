@@ -1,7 +1,7 @@
 /**
  * Seed 20 PHÒNG ĐẸP CÓ ẢNH THẬT (ảnh phòng ở thật từ Unsplash) lên Firestore.
  *
- * Ghi đè bộ tin công khai `bds001`–`bds020`, GIỮ NGUYÊN tin của tài khoản demo
+ * Ghi đè bộ tin công khai `bds001`–`bds022`, GIỮ NGUYÊN tin của tài khoản demo
  * (`demo001`–`demo003`) và mọi tin người dùng đăng.
  *
  * Chạy: npx tsx scripts/seed-rooms.ts
@@ -569,6 +569,8 @@ const ROOMS: RoomSeed[] = [
     rating: 5.0,
     reviewCount: 7,
     condition: 'new',
+    direction: 'Đông Nam',
+    furnished: 'full',
     views: 28_900,
     contactCount: 152,
     savedCount: 421,
@@ -599,6 +601,8 @@ const ROOMS: RoomSeed[] = [
     rating: 4.5,
     reviewCount: 10,
     condition: 'new',
+    direction: 'Tây Nam',
+    frontage: 4.5,
     views: 6_200,
     contactCount: 45,
     savedCount: 102,
@@ -663,6 +667,72 @@ const ROOMS: RoomSeed[] = [
     contactCount: 39,
     savedCount: 91,
   },
+  {
+    id: 'bds021',
+    title: 'Đất nền khu biệt thự Vạn Phúc Thủ Đức — hạ tầng hoàn chỉnh, sổ đỏ',
+    price: 4_200_000_000,
+    area: 60,
+    districtId: 'thuduc',
+    district: 'Thủ Đức',
+    ward: 'Phường Hiệp Bình Chánh',
+    address: 'Đường 25, Phường Hiệp Bình Chánh, Thủ Đức',
+    type: 'dat_nen',
+    bedrooms: 0,
+    bathrooms: 0,
+    direction: 'Đông',
+    legal: 'Sổ đỏ',
+    frontage: 5,
+    yearBuilt: 2022,
+    description:
+      'Đất nền 60m² trong khu biệt thự Vạn Phúc, hạ tầng hoàn thiện, đường nhựa rộng 12m, xây được trệt 2 lầu. Khu an ninh, gần sông, mát mẻ, thích hợp để ở hoặc đầu tư. Sổ đỏ chính chủ, sang tên ngay.',
+    amenities: ['Bảo vệ'],
+    contact: { name: 'Nguyễn Thị Oanh', phone: '0918888999' },
+    showPhone: true,
+    latitude: 10.8378,
+    longitude: 106.7171,
+    status: 'active',
+    createdAt: daysAgo(5),
+    rating: 4.6,
+    reviewCount: 5,
+    condition: 'new',
+    views: 8_200,
+    contactCount: 51,
+    savedCount: 143,
+  },
+  {
+    id: 'bds022',
+    title: 'Nhà phố 3 tầng mới xây Bình Thạnh — nội thất full, sổ hồng',
+    price: 7_500_000_000,
+    area: 96,
+    districtId: 'binhthanh',
+    district: 'Bình Thạnh',
+    ward: 'Phường 25',
+    address: '123 Ung Văn Khiêm, Bình Thạnh',
+    type: 'nha_nguyen_can',
+    bedrooms: 3,
+    bathrooms: 3,
+    floor: 3,
+    direction: 'Đông Nam',
+    legal: 'Sổ hồng',
+    frontage: 6,
+    furnished: 'full',
+    yearBuilt: 2023,
+    description:
+      'Nhà phố mới xây 2023, thiết kế hiện đại, 3 tầng, nội thất cao cấp đầy đủ. Hẻm xe hơi vào tận nhà, sân thượng rộng. Sổ hồng hoàn công đầy đủ, sang tên nhanh.',
+    amenities: ['Máy lạnh', 'Tủ lạnh', 'Bếp riêng', 'Thang máy', 'Bảo vệ'],
+    contact: { name: 'Đinh Công Quốc', phone: '0936666777' },
+    showPhone: true,
+    latitude: 10.8064,
+    longitude: 106.7042,
+    status: 'active',
+    createdAt: daysAgo(3),
+    rating: 4.9,
+    reviewCount: 8,
+    condition: 'new',
+    views: 22_400,
+    contactCount: 141,
+    savedCount: 312,
+  },
 ];
 
 async function main(): Promise<void> {
@@ -684,7 +754,7 @@ async function main(): Promise<void> {
     fixed++;
   }
   await batch.commit();
-  console.log(`✓ listings: ghi ${fixed} phòng (bds001–bds020), giữ nguyên tin demo & tin người dùng`);
+  console.log(`✓ listings: ghi ${fixed} tin (bds001–bds022), giữ nguyên tin demo & tin người dùng`);
 
   const snap = await db.collection('listings').count().get();
   console.log(`✓ Tổng số tin hiện có trên Firestore: ${snap.data().count}\n`);

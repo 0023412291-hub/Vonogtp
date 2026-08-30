@@ -6,7 +6,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { BORDER_RADIUS, COLORS, SHADOWS } from '@/constants/colors';
 import { PROPERTY_TYPES, type Listing } from '@/types';
-import { formatDate, formatPriceShort } from '@/utils/formatters';
+import { formatDate, formatDealPrice } from '@/utils/formatters';
 
 interface ListingCardProps {
   listing: Listing;
@@ -17,6 +17,12 @@ interface ListingCardProps {
 
 function typeLabel(type: Listing['type']): string {
   return PROPERTY_TYPES.find((t) => t.value === type)?.label ?? '';
+}
+
+/** Nhãn "Bán" nhỏ cạnh giá cho tin bán (tin cho thuê không cần nhãn) */
+function DealBadge({ deal }: { deal?: Listing['deal'] }) {
+  if (deal !== 'sale') return null;
+  return <Text style={styles.dealBadge}>Bán</Text>;
 }
 
 /** Hàng thông số: diện tích • phòng ngủ • toilet */
@@ -63,13 +69,17 @@ export function ListingCard({ listing, onPress, onFavoritePress, variant = 'grid
               <Text style={styles.listConditionText}>Cần sửa</Text>
             </View>
           )}
+          <View style={styles.listPhotoBadge}>
+            <Ionicons name="images-outline" size={10} color={COLORS.white} />
+            <Text style={styles.listPhotoBadgeText}>{listing.images.length}</Text>
+          </View>
         </View>
         <View style={styles.listBody}>
           <View style={styles.listTopRow}>
             <Text style={styles.listPrice} numberOfLines={1}>
-              {formatPriceShort(listing.price)}
-              <Text style={styles.listPriceUnit}>/tháng</Text>
+              {formatDealPrice(listing.price, listing.deal)}
             </Text>
+            <DealBadge deal={listing.deal} />
             {listing.rating != null && <Rating rating={listing.rating} />}
           </View>
           <Text style={styles.listTitle} numberOfLines={2}>
@@ -82,20 +92,24 @@ export function ListingCard({ listing, onPress, onFavoritePress, variant = 'grid
               {listing.ward}, {listing.district}
             </Text>
           </View>
-          <View style={styles.listTimeRow}>
-            <Ionicons name="time-outline" size={11} color={COLORS.textSecondary} />
-            <Text style={styles.listTimeText}>{formatDate(listing.createdAt)}</Text>
+          <View style={styles.listBottomRow}>
+            <View style={styles.listTimeRow}>
+              <Ionicons name="time-outline" size={11} color={COLORS.textSecondary} />
+              <Text style={styles.listTimeText}>{formatDate(listing.createdAt)}</Text>
+            </View>
+            {listing.status === 'rented' ? (
+              <Text style={styles.rentedTag}>Đã cho thuê</Text>
+            ) : onFavoritePress ? (
+              <TouchableOpacity onPress={onFavoritePress} hitSlop={8}>
+                <Ionicons
+                  name={listing.isFavorite ? 'heart' : 'heart-outline'}
+                  size={18}
+                  color={listing.isFavorite ? COLORS.warmGold : COLORS.grayMedium}
+                />
+              </TouchableOpacity>
+            ) : null}
           </View>
         </View>
-        {onFavoritePress && (
-          <TouchableOpacity onPress={onFavoritePress} style={styles.listHeart} hitSlop={8}>
-            <Ionicons
-              name={listing.isFavorite ? 'heart' : 'heart-outline'}
-              size={19}
-              color={listing.isFavorite ? COLORS.warmGold : COLORS.grayMedium}
-            />
-          </TouchableOpacity>
-        )}
       </TouchableOpacity>
     );
   }
@@ -109,8 +123,7 @@ export function ListingCard({ listing, onPress, onFavoritePress, variant = 'grid
             {listing.title}
           </Text>
           <Text style={styles.previewPrice}>
-            {formatPriceShort(listing.price)}
-            <Text style={styles.previewPriceUnit}>/tháng</Text>
+            {formatDealPrice(listing.price, listing.deal)}
           </Text>
           <Specs listing={listing} />
           <Text style={styles.previewMeta} numberOfLines={1}>
@@ -160,9 +173,9 @@ export function ListingCard({ listing, onPress, onFavoritePress, variant = 'grid
       <View style={styles.body}>
         <View style={styles.priceRow}>
           <Text style={styles.price} numberOfLines={1}>
-            {formatPriceShort(listing.price)}
-            <Text style={styles.priceUnit}>/tháng</Text>
+            {formatDealPrice(listing.price, listing.deal)}
           </Text>
+          <DealBadge deal={listing.deal} />
           {listing.rating != null && <Rating rating={listing.rating} count={listing.reviewCount} />}
         </View>
 
@@ -297,11 +310,6 @@ const styles = StyleSheet.create({
     color: COLORS.priceAccent,
     flexShrink: 1,
   },
-  priceUnit: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
   rating: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -385,24 +393,36 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
+  dealBadge: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+    backgroundColor: COLORS.warmGold,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
 
   // list variant
   listCard: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.md,
+    borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.border,
     marginBottom: 10,
+    ...SHADOWS.light,
   },
   listImageWrap: {
     position: 'relative',
+    width: 124,
+    height: 138,
   },
   listImage: {
-    width: 104,
+    width: '100%',
     height: '100%',
-    minHeight: 128,
   },
   listCondition: {
     position: 'absolute',
@@ -418,10 +438,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.white,
   },
+  listPhotoBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  listPhotoBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
   listBody: {
     flex: 1,
-    padding: 10,
-    gap: 3,
+    minHeight: 138,
+    justifyContent: 'center',
+    padding: 12,
+    gap: 4,
   },
   listTopRow: {
     flexDirection: 'row',
@@ -435,16 +474,11 @@ const styles = StyleSheet.create({
     color: COLORS.priceAccent,
     flexShrink: 1,
   },
-  listPriceUnit: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
   listTitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontWeight: '700',
     color: COLORS.darkBrown,
-    lineHeight: 17,
+    lineHeight: 18,
   },
   listLocationRow: {
     flexDirection: 'row',
@@ -457,20 +491,23 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     color: COLORS.textSecondary,
   },
+  listBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    marginTop: 5,
+    paddingTop: 5,
+  },
   listTimeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    marginTop: 2,
   },
   listTimeText: {
     fontSize: 10.5,
     color: COLORS.textSecondary,
-  },
-  listHeart: {
-    position: 'absolute',
-    right: 8,
-    top: 8,
   },
 
   // preview variant
@@ -502,11 +539,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: COLORS.priceAccent,
-  },
-  previewPriceUnit: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
   },
   previewMeta: {
     fontSize: 11,

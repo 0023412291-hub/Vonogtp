@@ -21,9 +21,24 @@ import { Stepper } from '@/components/stepper';
 import { BORDER_RADIUS, COLORS, SHADOWS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
 import { HCMC_CENTER, SCHOOLS } from '@/data/constants';
-import { PROPERTY_TYPES, type Condition, type PropertyType } from '@/types';
+import {
+  DIRECTIONS,
+  LEGALS,
+  PROPERTY_TYPES,
+  type Condition,
+  type DealType,
+  type Direction,
+  type Legal,
+  type PropertyType,
+} from '@/types';
 import { filterListings } from '@/utils/filters';
-import { distanceKm, formatDistanceKm, formatPriceShort, PRICE_PRESETS } from '@/utils/formatters';
+import {
+  distanceKm,
+  formatDealPrice,
+  formatDistanceKm,
+  PRICE_PRESETS,
+  SALES_PRICE_PRESETS,
+} from '@/utils/formatters';
 
 type SearchTab = 'school' | 'type' | 'map';
 
@@ -55,6 +70,9 @@ export default function SearchScreen() {
   const [bedrooms, setBedrooms] = useState<number | null>(filters.bedrooms);
   const [bathrooms, setBathrooms] = useState<number | null>(filters.bathrooms);
   const [condition, setCondition] = useState<Condition | null>(filters.condition);
+  const [deal, setDeal] = useState<DealType | null>(filters.deal);
+  const [directions, setDirections] = useState<Direction[]>(filters.directions);
+  const [legals, setLegals] = useState<Legal[]>(filters.legals);
   const [focusId, setFocusId] = useState<string | null>(params.focus ?? null);
   const mapRef = useRef<any>(null);
 
@@ -101,6 +119,9 @@ export default function SearchScreen() {
     bedrooms,
     bathrooms,
     condition,
+    deal,
+    directions,
+    legals,
     schoolId: tab === 'school' ? schoolId : null,
     maxDistanceKm: tab === 'school' ? maxDistance : null,
   };
@@ -127,6 +148,9 @@ export default function SearchScreen() {
       bedrooms,
       bathrooms,
       condition,
+      deal,
+      directions,
+      legals,
       schoolId: tab === 'school' ? schoolId : null,
       maxDistanceKm: tab === 'school' ? maxDistance : null,
     });
@@ -144,6 +168,39 @@ export default function SearchScreen() {
       );
     }
   };
+
+  const onDealChange = (value: DealType | null) => {
+    setDeal(value);
+    setPriceMin(null);
+    setPriceMax(null);
+  };
+
+  const pricePresets = deal === 'sale' ? SALES_PRICE_PRESETS : PRICE_PRESETS;
+
+  const renderPriceBlock = (presets: typeof PRICE_PRESETS) => (
+    <>
+      <Text style={styles.blockLabel}>
+        Mức giá {deal === 'sale' ? '(đồng)' : '(đồng/tháng)'}
+      </Text>
+      <View style={styles.chipWrap}>
+        {presets.map((p) => {
+          const active = priceMin === p.min && priceMax === p.max;
+          return (
+            <TouchableOpacity
+              key={p.label}
+              style={[styles.presetChip, active && styles.presetChipActive]}
+              onPress={() => {
+                setPriceMin(p.min);
+                setPriceMax(p.max);
+              }}
+            >
+              <Text style={[styles.presetText, active && styles.presetTextActive]}>{p.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </>
+  );
 
   const renderSchoolTab = () => (
     <View style={styles.tabContent}>
@@ -201,29 +258,34 @@ export default function SearchScreen() {
         <Text style={styles.sliderLabel}>10km+</Text>
       </View>
 
-      <Text style={styles.blockLabel}>Mức giá</Text>
-      <View style={styles.chipWrap}>
-        {PRICE_PRESETS.map((p) => {
-          const active = priceMin === p.min && priceMax === p.max;
-          return (
-            <TouchableOpacity
-              key={p.label}
-              style={[styles.presetChip, active && styles.presetChipActive]}
-              onPress={() => {
-                setPriceMin(p.min);
-                setPriceMax(p.max);
-              }}
-            >
-              <Text style={[styles.presetText, active && styles.presetTextActive]}>{p.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {renderPriceBlock(pricePresets)}
     </View>
   );
 
   const renderTypeTab = () => (
     <View style={styles.tabContent}>
+      <Text style={styles.blockLabel}>Hình thức</Text>
+      <View style={styles.chipWrap}>
+        {(
+          [
+            { value: null, label: 'Tất cả' },
+            { value: 'rent' as DealType, label: 'Cho thuê' },
+            { value: 'sale' as DealType, label: 'Bán' },
+          ] as { value: DealType | null; label: string }[]
+        ).map((o) => {
+          const active = deal === o.value;
+          return (
+            <TouchableOpacity
+              key={o.label}
+              style={[styles.presetChip, active && styles.presetChipActive]}
+              onPress={() => onDealChange(o.value)}
+            >
+              <Text style={[styles.presetText, active && styles.presetTextActive]}>{o.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <Text style={styles.blockLabel}>Loại hình (Hướng B)</Text>
       <View style={styles.typeGrid}>
         {PROPERTY_TYPES.map((t) => {
@@ -251,6 +313,46 @@ export default function SearchScreen() {
           );
         })}
       </View>
+
+      <Text style={styles.blockLabel}>Hướng</Text>
+      <View style={styles.chipWrap}>
+        {DIRECTIONS.map((d) => {
+          const active = directions.includes(d);
+          return (
+            <TouchableOpacity
+              key={d}
+              style={[styles.presetChip, active && styles.presetChipActive]}
+              onPress={() =>
+                setDirections(active ? directions.filter((x) => x !== d) : [...directions, d])
+              }
+            >
+              <Text style={[styles.presetText, active && styles.presetTextActive]}>{d}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {deal === 'sale' && (
+        <>
+          <Text style={styles.blockLabel}>Pháp lý</Text>
+          <View style={styles.chipWrap}>
+            {LEGALS.map((lg) => {
+              const active = legals.includes(lg);
+              return (
+                <TouchableOpacity
+                  key={lg}
+                  style={[styles.presetChip, active && styles.presetChipActive]}
+                  onPress={() =>
+                    setLegals(active ? legals.filter((x) => x !== lg) : [...legals, lg])
+                  }
+                >
+                  <Text style={[styles.presetText, active && styles.presetTextActive]}>{lg}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       <View style={styles.stepperCard}>
         <View style={styles.stepperRow}>
@@ -315,24 +417,7 @@ export default function SearchScreen() {
         })}
       </View>
 
-      <Text style={styles.blockLabel}>Mức giá</Text>
-      <View style={styles.chipWrap}>
-        {PRICE_PRESETS.map((p) => {
-          const active = priceMin === p.min && priceMax === p.max;
-          return (
-            <TouchableOpacity
-              key={p.label}
-              style={[styles.presetChip, active && styles.presetChipActive]}
-              onPress={() => {
-                setPriceMin(p.min);
-                setPriceMax(p.max);
-              }}
-            >
-              <Text style={[styles.presetText, active && styles.presetTextActive]}>{p.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {renderPriceBlock(pricePresets)}
     </View>
   );
 
@@ -370,7 +455,7 @@ export default function SearchScreen() {
               key={l.id}
               coordinate={{ latitude: l.latitude, longitude: l.longitude }}
               title={l.title}
-              description={`${formatPriceShort(l.price)}/tháng`}
+              description={formatDealPrice(l.price, l.deal)}
               onPress={() => setFocusId(l.id)}
             >
               <View style={[styles.markerPin, focusId === l.id && styles.markerPinActive]}>
@@ -420,7 +505,7 @@ export default function SearchScreen() {
                 {focused.title}
               </Text>
               <Text style={styles.mapCardPrice}>
-                {formatPriceShort(focused.price)}/tháng
+                {formatDealPrice(focused.price, focused.deal)}
               </Text>
               <Text style={styles.mapCardMeta} numberOfLines={1}>
                 {focused.area}m² • {focused.district}

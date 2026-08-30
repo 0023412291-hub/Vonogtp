@@ -4,11 +4,12 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import { getFirebaseAuth } from '@/firebase/app';
-import { ensureSessionSignIn, fetchUserProfile, isAnonymousUser, onAuthStateChange, saveUserProfile, signOutFirebase } from '@/firebase/auth';
+import { ensureSessionSignIn, fetchUserProfileWithRetry, onAuthStateChange, saveUserProfile, signOutFirebase } from '@/firebase/auth';
 import { registerFcmToken } from '@/firebase/messaging';
 import {
   addLeadRemote,
@@ -19,6 +20,7 @@ import {
   incrementListingSaves,
   incrementListingViews,
   markRentedRemote,
+  removeFavoriteRemote,
   subscribeFavorites,
   subscribeListings,
   toggleFavoriteRemote,
@@ -42,6 +44,8 @@ interface AppContextValue {
   listings: Listing[];
   myListings: Listing[];
   favorites: string[];
+  /** Số tin yêu thích còn tồn tại (không đếm tin đã bị xóa) */
+  favoriteCount: number;
   user: User | null;
   /** Chế độ đang dùng: mặc định renter khi chưa đăng nhập hoặc chưa chọn */
   activeRole: UserRole;
@@ -87,6 +91,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [contactedIds, setContactedIds] = useState<string[]>([]);
   /** uid session Firebase hiện tại (ẩn danh nếu khách) — dùng làm chủ tin khi khách đăng */
   const [sessionUid, setSessionUid] = useState<string | null>(null);
+  /** Bản mới nhất của user để chặn fallback đè lên profile đã đăng nhập (kẹt closure) */
+  const userRef = useRef<User | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   // ---- Đồng bộ dữ liệu từ Firestore (JS SDK — chạy cả trong Expo Go) ----
   useEffect(() => {
@@ -126,9 +135,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setFavorites([]);
     if (!firebaseEnabled || !user?.uid) return;
     let active = true;
-    const unsub = subscribeFavorites(user.uid, (ids) => {
-      if (active) setFavorites(ids);
-    });
+    const unsub = subscribeFavorites(
+      user.uid,
+      (ids) => {
+        if (active) setFavorites(ids);
+      },
+      (error) => {
+        if (__DEV__) console.warn('Firestore favorites error:', error);
+      },
+    );
     return () => {
       active = false;
       unsub();
@@ -157,29 +172,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!firebaseEnabled) return;
     let active = true;
-    const unsubscribe = onAuthStateChange(async (uid) => {
-      if (!active) return;
-      // Luôn ghi lại uid session (kể cả ẩn danh) — khách đăng tin vẫn có chủ sở hữu
+
+    /**
+     * NGUỒN CHÂN LÝ = getFirebaseAuth().currentUser tại thời điểm XỬ LÝ, KHÔNG phải
+     * uid truyền vào callback. Callback onAuthStateChanged có thể bắn uid của một
+     * session cũ (vd anonymous vừa bị restore đè, hoặc đang đổi real↔anon) — nếu tin
+     * theo uid đó sẽ "đầu độc" state user bằng uid không còn là currentUser, làm mọi
+     * subscription favorites/leads/notifications đọc nhầm doc → bị rules chặn.
+     */
+    const syncFromAuth = () => {
+      const fireAuth = getFirebaseAuth();
+      const current = fireAuth.currentUser;
+      const uid = current?.uid ?? null;
+      // Luôn đồng bộ sessionUid theo auth user hiện tại (có thể là ẩn danh)
       setSessionUid(uid);
-      // Session ẩn danh (khách): giữ quyền ghi dữ liệu nhưng UI coi như chưa đăng nhập
-      if (uid && isAnonymousUser()) {
+      // Ẩn danh hoặc chưa có session → khách
+      if (!current || current.isAnonymous) {
         setUser(null);
         return;
       }
-      if (uid) {
-        const profile = await fetchUserProfile(uid);
+      const realUid = current.uid;
+      (async () => {
+        let profile: User | null = null;
+        try {
+          profile = await fetchUserProfileWithRetry(realUid);
+        } catch (error) {
+          // Token Firestore vừa đổi (real → anon...) lần đọc đầu có thể bị rules chặn tạm thời.
+          if (__DEV__) {
+            console.warn(
+              `[session] Đọc hồ sơ Firestore bị chặn (uid=${realUid}), dùng hồ sơ mặc định:`,
+              error,
+            );
+          }
+        }
         if (!active) return;
+        // Auth đã đổi user trong lúc đọc → bỏ kết quả cũ, event dành cho user mới đã xử lý
+        if (getFirebaseAuth().currentUser?.uid !== realUid) return;
+        // Fallback KHÔNG được đè profile mà luồng đăng nhập vừa set (signIn)
+        if (!profile && userRef.current) return;
         setUser(
           profile
-            ? { ...profile, uid }
-            : { uid, name: 'Người dùng', phone: '', email: '', role: 'renter' },
+            ? { ...profile, uid: realUid }
+            : { uid: realUid, name: 'Người dùng', phone: '', email: '', role: 'renter' },
         );
         // Khôi phục session bằng tài khoản thật → đăng ký nhận push
-        registerFcmToken(uid).catch(() => {});
-      } else {
-        setUser(null);
-      }
-    });
+        registerFcmToken(realUid).catch(() => {});
+      })();
+    };
+
+    const unsubscribe = onAuthStateChange(() => syncFromAuth());
+    // Chạy ngay để đồng bộ trạng thái bắt đầu chính xác
+    syncFromAuth();
     return () => {
       active = false;
       unsubscribe();
@@ -205,6 +248,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ? listingsWithFav.filter((l) => l.ownerUid && l.ownerUid === writeUid)
         : myListingsState,
     [firebaseEnabled, listingsWithFav, writeUid, myListingsState],
+  );
+
+  /**
+   * Số tin yêu thích CÒN TỒN TẠI — tin đã bị xóa vẫn nằm trong favorites/{uid}.listingIds
+   * nhưng không được đếm (các trang hiển thị số này phải dùng chung giá trị này).
+   */
+  const favoriteCount = useMemo(
+    () => listings.filter((l) => favorites.includes(l.id)).length,
+    [listings, favorites],
   );
 
   const toggleFavorite = useCallback(
@@ -327,9 +379,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setFavorites((prev) => prev.filter((f) => f !== id));
       if (firebaseEnabled) {
         deleteListingRemote(id).catch(() => {});
+        // Tin đã bị xóa → dọn luôn khỏi danh sách yêu thích của chính user trên Firestore,
+        // nếu không snapshot favorites sẽ kéo id chết trở lại (yêu thích "không được xóa").
+        if (user?.uid) removeFavoriteRemote(user.uid, id).catch(() => {});
       }
     },
-    [firebaseEnabled],
+    [firebaseEnabled, user?.uid],
   );
 
   const updateListing = useCallback((id: string, partial: Partial<Listing>) => {
@@ -379,6 +434,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       listings: listingsWithFav,
       myListings,
       favorites,
+      favoriteCount,
       user,
       activeRole,
       filters,
@@ -406,6 +462,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       listingsWithFav,
       myListings,
       favorites,
+      favoriteCount,
       user,
       activeRole,
       filters,

@@ -8,7 +8,7 @@ import { ActionButton } from '@/components/action-button';
 import { EmptyState } from '@/components/empty-state';
 import { BORDER_RADIUS, COLORS } from '@/constants/colors';
 import type { Listing } from '@/types';
-import { formatPriceShort } from '@/utils/formatters';
+import { formatDealPrice } from '@/utils/formatters';
 
 interface ManageListingsModalProps {
   visible: boolean;
@@ -69,7 +69,7 @@ export function ManageListingsModal({ visible, listings, onClose, onEdit, onDele
                       {l.title}
                     </Text>
                     <Text style={styles.meta} numberOfLines={1}>
-                      {formatPriceShort(l.price)}/tháng • {l.area}m² •{' '}
+                      {formatDealPrice(l.price, l.deal)} • {l.area}m² •{' '}
                       {l.status === 'rented' ? 'Đã cho thuê' : 'Đang hiển thị'}
                     </Text>
                   </View>

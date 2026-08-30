@@ -7,11 +7,12 @@ import { COLORS } from '@/constants/colors';
 interface FilterChipProps {
   label: string;
   active?: boolean;
-  chevron?: boolean;
+  /** Tên icon hiển thị bên phải (vd close-circle, chevron-down) */
+  icon?: 'close-circle' | 'chevron-down';
   onPress?: () => void;
 }
 
-export function FilterChip({ label, active = false, chevron = false, onPress }: FilterChipProps) {
+export function FilterChip({ label, active = false, icon, onPress }: FilterChipProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -21,10 +22,10 @@ export function FilterChip({ label, active = false, chevron = false, onPress }: 
       <Text style={[styles.text, active && styles.textActive]} numberOfLines={1}>
         {label}
       </Text>
-      {chevron && (
+      {icon && (
         <Ionicons
-          name="chevron-down"
-          size={12}
+          name={icon}
+          size={icon === 'close-circle' ? 14 : 12}
           color={active ? COLORS.darkBrown : COLORS.textSecondary}
         />
       )}

@@ -39,6 +39,7 @@ const PAGE_SIZE = 8;
 const DRAWER_WIDTH = Math.min(Dimensions.get('window').width * 0.65, 420);
 
 type ChipKey = 'price' | 'district' | 'type' | null;
+type ViewMode = 'grid' | 'list';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -49,7 +50,9 @@ export default function HomeScreen() {
     favorites,
     filters,
     updateFilters,
+    resetFilters,
     toggleFavorite,
+    favoriteCount,
     deleteListing,
     markRented,
     user,
@@ -63,6 +66,7 @@ export default function HomeScreen() {
   const [picker, setPicker] = useState<{ key: ChipKey; visible: boolean }>({ key: null, visible: false });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const drawerAnim = useRef(new Animated.Value(0)).current;
   const mounted = useRef(true);
 
@@ -167,13 +171,15 @@ export default function HomeScreen() {
     }
     return (
       <FlatList
+        key={viewMode}
         data={shown}
         keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.gridRow}
-        contentContainerStyle={styles.listContent}
+        numColumns={viewMode === 'list' ? 1 : 2}
+        columnWrapperStyle={viewMode === 'list' ? undefined : styles.gridRow}
+        contentContainerStyle={viewMode === 'list' ? styles.listContentList : styles.listContent}
         renderItem={({ item }) => (
           <ListingCard
+            variant={viewMode === 'list' ? 'list' : 'grid'}
             listing={item}
             onPress={() => router.push(`/listing/${item.id}`)}
             onFavoritePress={() => toggleFavorite(item.id)}
@@ -181,6 +187,7 @@ export default function HomeScreen() {
         )}
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
+        extraData={favorites}
         ListHeaderComponent={renderGridHeader}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.warmGold} />}
         ListFooterComponent={
@@ -353,15 +360,31 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.headerRight}>
+          <View style={styles.viewToggle}>
+            {(['grid', 'list'] as const).map((m) => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.viewToggleBtn, viewMode === m && styles.viewToggleBtnActive]}
+                onPress={() => setViewMode(m)}
+                hitSlop={4}
+              >
+                <Ionicons
+                  name={m === 'grid' ? 'grid-outline' : 'list-outline'}
+                  size={17}
+                  color={viewMode === m ? COLORS.white : COLORS.darkBrown}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/favorites')}
             style={styles.iconBtn}
             hitSlop={6}
           >
             <Ionicons name="heart-outline" size={22} color={COLORS.darkBrown} />
-            {favorites.length > 0 && (
+            {favoriteCount > 0 && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>{favorites.length}</Text>
+                <Text style={styles.badgeText}>{favoriteCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -435,27 +458,30 @@ export default function HomeScreen() {
         <FilterChip
           label="Giá"
           active={filterCount > 0 && (filters.priceMin != null || filters.priceMax != null)}
-          chevron
+          icon="chevron-down"
           onPress={() => setPicker({ key: 'price', visible: true })}
         />
         <FilterChip
           label="Khu vực"
           active={filters.districts.length > 0}
-          chevron
+          icon="chevron-down"
           onPress={() => setPicker({ key: 'district', visible: true })}
         />
         <FilterChip
           label="Loại hình"
           active={filters.types.length > 0}
-          chevron
+          icon="chevron-down"
           onPress={() => setPicker({ key: 'type', visible: true })}
         />
         <FilterChip
           label={filterCount > 0 ? `Lọc (${filterCount})` : 'Thêm'}
           active={filterCount > 0}
-          chevron={filterCount === 0}
+          icon={filterCount === 0 ? 'chevron-down' : undefined}
           onPress={() => router.push('/search')}
         />
+        {filterCount > 0 && (
+          <FilterChip label="Xoá lọc" active icon="close-circle" onPress={resetFilters} />
+        )}
       </View>
 
       {renderGrid()}
@@ -576,6 +602,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 18,
+    padding: 2,
+    marginRight: 2,
+  },
+  viewToggleBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewToggleBtnActive: {
+    backgroundColor: COLORS.warmGold,
   },
   badge: {
     position: 'absolute',
@@ -722,6 +766,11 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 24,
+  },
+  listContentList: {
+    paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 24,
   },

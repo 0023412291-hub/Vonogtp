@@ -24,7 +24,7 @@ import { useApp } from '@/context/app-context';
 import { subscribeLeads, subscribeNotifications, updateLeadStatusRemote } from '@/firebase/firestore';
 import { PROPERTY_TYPES, USER_ROLES, type AppNotification, type Lead, type LeadStatus } from '@/types';
 import { activeFiltersCount } from '@/utils/filters';
-import { formatNumber, formatPriceShort, formatViews } from '@/utils/formatters';
+import { formatDealPrice, formatNumber, formatPriceShort, formatViews } from '@/utils/formatters';
 
 /** Cờ Firebase luôn bật (JS SDK) — khai báo cục bộ thay vì import barrel '@/firebase' bị lỗi transform */
 const firebaseEnabled = true;
@@ -76,6 +76,7 @@ export default function AccountScreen() {
     favorites,
     filters,
     recentListings,
+    favoriteCount,
   } = useApp();
 
   const [editOpen, setEditOpen] = useState(false);
@@ -95,9 +96,15 @@ export default function AccountScreen() {
       return;
     }
     let active = true;
-    const unsub = subscribeLeads(user.uid, (remote) => {
-      if (active) setLeads(remote);
-    });
+    const unsub = subscribeLeads(
+      user.uid,
+      (remote) => {
+        if (active) setLeads(remote);
+      },
+      (error) => {
+        if (__DEV__) console.warn('Firestore leads error:', error);
+      },
+    );
     return () => {
       active = false;
       unsub();
@@ -111,9 +118,15 @@ export default function AccountScreen() {
       return;
     }
     let active = true;
-    const unsub = subscribeNotifications(user.uid, (remote) => {
-      if (active) setNotifs(remote);
-    });
+    const unsub = subscribeNotifications(
+      user.uid,
+      (remote) => {
+        if (active) setNotifs(remote);
+      },
+      (error) => {
+        if (__DEV__) console.warn('Firestore notifications error:', error);
+      },
+    );
     return () => {
       active = false;
       unsub();
@@ -325,7 +338,7 @@ export default function AccountScreen() {
             </View>
             <View style={styles.renterStats}>
               <View style={styles.renterStat}>
-                <Text style={styles.renterStatNum}>{favorites.length}</Text>
+                <Text style={styles.renterStatNum}>{favoriteCount}</Text>
                 <Text style={styles.renterStatLabel}>Tin đã lưu</Text>
               </View>
               <View style={styles.renterStatDivider} />
@@ -407,7 +420,7 @@ export default function AccountScreen() {
                           {l.title}
                         </Text>
                         <Text style={styles.myMeta}>
-                          {formatPriceShort(l.price)}/tháng • {l.area}m²
+                          {formatDealPrice(l.price, l.deal)} • {l.area}m²
                         </Text>
                         <Text style={styles.myDate}>{l.district}</Text>
                       </View>

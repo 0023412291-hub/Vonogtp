@@ -16,6 +16,10 @@ export function filterListings(listings: Listing[], filters: Filters): Listing[]
     if (filters.priceMax != null && l.price > filters.priceMax) return false;
     if (filters.districts.length > 0 && !filters.districts.includes(l.district)) return false;
     if (filters.types.length > 0 && !filters.types.includes(l.type)) return false;
+    if (filters.deal && (l.deal ?? 'rent') !== filters.deal) return false;
+    if (filters.directions.length > 0 && !(l.direction && filters.directions.includes(l.direction)))
+      return false;
+    if (filters.legals.length > 0 && !(l.legal && filters.legals.includes(l.legal))) return false;
     if (filters.bedrooms != null && l.bedrooms < filters.bedrooms) return false;
     if (filters.bathrooms != null && l.bathrooms < filters.bathrooms) return false;
     if (filters.condition && l.condition !== filters.condition) return false;
@@ -35,5 +39,8 @@ export function activeFiltersCount(f: Filters): number {
   if (f.bathrooms != null) n += 1;
   if (f.condition) n += 1;
   if (f.schoolId != null) n += 1;
+  if (f.deal) n += 1;
+  if (f.directions.length > 0) n += 1;
+  if (f.legals.length > 0) n += 1;
   return n;
 }

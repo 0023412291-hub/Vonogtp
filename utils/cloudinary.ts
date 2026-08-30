@@ -29,7 +29,7 @@ function isLocalUri(uri: string): boolean {
   return !uri.startsWith('http://') && !uri.startsWith('https://');
 }
 
-/** Upload 1 ảnh lên Cloudinary — trả về URL hosted (secure_url) */
+/** Upload 1 ảnh lên Cloudinary — trả về URL hosted (secure_url), chạy được cả Android/iOS lẫn web. */
 export async function uploadImageToCloudinary(uri: string): Promise<string> {
   if (!cloudinaryConfigured()) {
     throw new Error(
@@ -37,11 +37,20 @@ export async function uploadImageToCloudinary(uri: string): Promise<string> {
     );
   }
   const formData = new FormData();
-  formData.append('file', {
-    uri,
-    type: 'image/jpeg',
-    name: `vono-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`,
-  } as unknown as Blob);
+  // Web: expo-image-picker trả về data/blob URL → fetch ra Blob thật mới gửi được FormData.
+  // Native: URI file:// → cú pháp {uri, type, name} mới đúng.
+  const isWeb = typeof window !== 'undefined' && !uri.startsWith('file:');
+  const fileName = `vono-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  if (isWeb) {
+    const blob = await (await fetch(uri)).blob();
+    formData.append('file', new Blob([blob], { type: 'image/jpeg' }), fileName);
+  } else {
+    formData.append('file', {
+      uri,
+      type: 'image/jpeg',
+      name: fileName,
+    } as unknown as Blob);
+  }
   formData.append('upload_preset', UPLOAD_PRESET);
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {

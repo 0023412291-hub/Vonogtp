@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -25,9 +26,9 @@ import { StepProgress } from '@/components/step-progress';
 import { BORDER_RADIUS, COLORS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
 import { DISTRICTS } from '@/data/constants';
-import { AMENITIES, PROPERTY_TYPES, type Condition, type Listing, type PropertyType } from '@/types';
+import { AMENITIES, DIRECTIONS, FURNISHED_OPTIONS, LEGALS, PROPERTY_TYPES, type Condition, type DealType, type Direction, type Furnished, type Legal, type Listing, type PropertyType } from '@/types';
 import { cloudinaryConfigured, uploadImagesToCloudinary } from '@/utils/cloudinary';
-import { formatPriceShort } from '@/utils/formatters';
+import { dealLabel, formatDealPrice, formatPriceShort } from '@/utils/formatters';
 import { isValidPhone } from '@/utils/validation';
 
 const STEP_LABELS = ['Thông tin cơ bản', 'Ảnh', 'Mô tả & tiện nghi', 'Liên hệ', 'Xác nhận'];
@@ -35,12 +36,18 @@ const STEP_LABELS = ['Thông tin cơ bản', 'Ảnh', 'Mô tả & tiện nghi', 
 interface FormState {
   title: string;
   type: PropertyType | null;
+  deal: DealType;
   districtId: string;
   ward: string;
   price: string;
   area: string;
   bedrooms: number;
   bathrooms: number;
+  floors: number;
+  direction: Direction | '';
+  legal: Legal | '';
+  frontage: string;
+  furnished: Furnished | '';
   images: string[];
   description: string;
   amenities: string[];
@@ -57,12 +64,18 @@ interface FormState {
 const INITIAL_FORM: FormState = {
   title: '',
   type: null,
+  deal: 'rent',
   districtId: '',
   ward: '',
   price: '',
   area: '',
   bedrooms: 1,
   bathrooms: 1,
+  floors: 1,
+  direction: '',
+  legal: '',
+  frontage: '',
+  furnished: '',
   images: [],
   description: '',
   amenities: [],
@@ -104,12 +117,18 @@ export default function PostScreen() {
     setForm({
       title: l.title,
       type: l.type,
+      deal: l.deal ?? 'rent',
       districtId: l.districtId,
       ward: l.ward,
       price: String(l.price),
       area: String(l.area),
       bedrooms: l.bedrooms,
       bathrooms: l.bathrooms,
+      floors: l.floor ?? 1,
+      direction: l.direction ?? '',
+      legal: l.legal ?? '',
+      frontage: l.frontage != null ? String(l.frontage) : '',
+      furnished: l.furnished ?? '',
       images: l.images,
       description: l.description,
       amenities: AMENITIES.filter((a) => l.amenities.includes(a)),
@@ -171,26 +190,70 @@ export default function PostScreen() {
       Alert.alert('Giới hạn', 'Tối đa 12 ảnh mỗi tin đăng.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: remaining,
-      quality: 0.7,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.7,
+      });
+      if (!result.canceled) {
+        set('images', [...form.images, ...result.assets.map((a) => a.uri)].slice(0, 12));
+      }
+    } catch (err) {
+      console.warn('Chọn ảnh từ thư viện lỗi:', err);
+      Alert.alert(
+        'Không mở được thư viện ảnh',
+        String((err as Error)?.message ?? err) +
+          '\n\nNếu bạn chạy bản dev (expo run:android), có thể cần build lại app để cập nhật module ảnh.',
+      );
+    }
+  };
+
+  const launchCamera = async () => {
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (!result.canceled) {
-      set('images', [...form.images, ...result.assets.map((a) => a.uri)].slice(0, 12));
+      set('images', [...form.images, result.assets[0].uri].slice(0, 12));
     }
   };
 
   const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Cần quyền camera', 'Vui lòng cấp quyền camera để chụp ảnh.');
+    let perm;
+    try {
+      perm = await ImagePicker.requestCameraPermissionsAsync();
+    } catch (err) {
+      console.warn('Xin quyền camera lỗi:', err);
+      Alert.alert(
+        'Không mở được camera',
+        String((err as Error)?.message ?? err) +
+          '\n\nNếu bạn chạy bản dev (expo run:android), có thể cần build lại app để cập nhật module camera.',
+      );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
-    if (!result.canceled) {
-      set('images', [...form.images, result.assets[0].uri].slice(0, 12));
+    if (!perm.granted) {
+      Alert.alert(
+        'Cần quyền camera',
+        perm.canAskAgain
+          ? 'Vui lòng cấp quyền camera để chụp ảnh đăng tin.'
+          : 'Quyền camera đã bị tắt vĩnh viễn. Vào Cài đặt để bật lại.',
+        perm.canAskAgain
+          ? [{ text: 'Thử lại', onPress: () => launchCamera() }]
+          : [
+              { text: 'Huỷ', style: 'cancel' },
+              { text: 'Mở cài đặt', onPress: () => Linking.openSettings() },
+            ],
+      );
+      return;
+    }
+    try {
+      await launchCamera();
+    } catch (err) {
+      console.warn('Mở camera lỗi:', err);
+      Alert.alert(
+        'Không mở được camera',
+        String((err as Error)?.message ?? err) +
+          '\n\nNếu bạn chạy bản dev (expo run:android), có thể cần build lại app để cập nhật module camera.',
+      );
     }
   };
 
@@ -222,10 +285,17 @@ export default function PostScreen() {
       }
       const price = Number(form.price);
       const area = Number(form.area);
+      const frontage = Number(form.frontage);
       const listingData: Omit<Listing, 'id' | 'createdAt' | 'isFavorite' | 'status'> = {
         title: form.title.trim(),
         price,
         area,
+        deal: form.deal,
+        direction: form.direction || undefined,
+        legal: form.deal === 'sale' ? (form.legal || undefined) : undefined,
+        frontage: frontage > 0 ? frontage : undefined,
+        floor: form.type === 'nha_nguyen_can' ? form.floors : undefined,
+        furnished: form.deal === 'sale' ? (form.furnished || undefined) : undefined,
         districtId: form.districtId,
         district: district?.name ?? '',
         ward: form.ward,
@@ -344,6 +414,36 @@ export default function PostScreen() {
             />
 
             <Text style={styles.fieldLabel}>
+              Hình thức <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.conditionRow}>
+              {(
+                [
+                  { value: 'rent' as DealType, label: 'Cho thuê' },
+                  { value: 'sale' as DealType, label: 'Bán' },
+                ] as { value: DealType; label: string }[]
+              ).map((o) => {
+                const active = form.deal === o.value;
+                return (
+                  <TouchableOpacity
+                    key={o.value}
+                    style={[styles.conditionChip, active && styles.conditionChipActive]}
+                    onPress={() => set('deal', o.value)}
+                  >
+                    <Ionicons
+                      name={active ? 'radio-button-on' : 'radio-button-off'}
+                      size={16}
+                      color={active ? COLORS.warmGold : COLORS.grayMedium}
+                    />
+                    <Text style={[styles.conditionText, active && styles.conditionTextActive]}>
+                      {o.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={styles.fieldLabel}>
               Loại hình <Text style={styles.required}>*</Text>
             </Text>
             <View style={styles.typeGrid}>
@@ -398,14 +498,20 @@ export default function PostScreen() {
             )}
 
             <FormField
-              label="Giá cho thuê (đồng/tháng)"
+              label={form.deal === 'sale' ? 'Giá bán (đồng)' : 'Giá cho thuê (đồng/tháng)'}
               required
               value={form.price}
               onChangeText={(t) => set('price', t.replace(/[^0-9]/g, ''))}
-              placeholder="3500000"
+              placeholder={form.deal === 'sale' ? '3500000000' : '3500000'}
               keyboardType="number-pad"
               error={errors.price}
-              hint={form.price ? `≈ ${formatPriceShort(Number(form.price))}/tháng` : undefined}
+              hint={
+                form.price
+                  ? form.deal === 'sale'
+                    ? `≈ ${formatPriceShort(Number(form.price))}`
+                    : `≈ ${formatPriceShort(Number(form.price))}/tháng`
+                  : undefined
+              }
             />
 
             <FormField
@@ -432,6 +538,107 @@ export default function PostScreen() {
               </View>
               <Stepper value={form.bathrooms} onChange={(v) => set('bathrooms', v)} min={0} max={10} />
             </View>
+
+            {form.type && form.type !== 'phong_tro' && (
+              <>
+                <Text style={styles.fieldLabel}>Hướng</Text>
+                <View style={styles.chipWrap}>
+                  {DIRECTIONS.map((d) => {
+                    const active = form.direction === d;
+                    return (
+                      <TouchableOpacity
+                        key={d}
+                        style={[styles.conditionChip, active && styles.conditionChipActive]}
+                        onPress={() => set('direction', active ? '' : d)}
+                      >
+                        <Ionicons
+                          name={active ? 'checkmark-circle' : 'ellipse-outline'}
+                          size={15}
+                          color={active ? COLORS.warmGold : COLORS.grayMedium}
+                        />
+                        <Text style={[styles.conditionText, active && styles.conditionTextActive]}>
+                          {d}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            {form.type === 'nha_nguyen_can' && (
+              <View style={styles.stepperRow}>
+                <View style={styles.stepperInfo}>
+                  <Text style={styles.stepperLabel}>Số tầng</Text>
+                  <Text style={styles.stepperHint}>Số tầng của căn nhà</Text>
+                </View>
+                <Stepper value={form.floors} onChange={(v) => set('floors', v)} min={1} max={20} />
+              </View>
+            )}
+
+            {(form.type === 'nha_nguyen_can' || form.type === 'dat_nen') && (
+              <FormField
+                label="Mặt tiền (m) — không bắt buộc"
+                value={form.frontage}
+                onChangeText={(t) => set('frontage', t.replace(/[^0-9.]/g, ''))}
+                placeholder="4.5"
+                keyboardType="decimal-pad"
+              />
+            )}
+
+            {form.deal === 'sale' && form.type && (
+              <>
+                <Text style={styles.fieldLabel}>Pháp lý</Text>
+                <View style={styles.chipWrap}>
+                  {LEGALS.map((lg) => {
+                    const active = form.legal === lg;
+                    return (
+                      <TouchableOpacity
+                        key={lg}
+                        style={[styles.conditionChip, active && styles.conditionChipActive]}
+                        onPress={() => set('legal', active ? '' : lg)}
+                      >
+                        <Ionicons
+                          name={active ? 'radio-button-on' : 'radio-button-off'}
+                          size={15}
+                          color={active ? COLORS.warmGold : COLORS.grayMedium}
+                        />
+                        <Text style={[styles.conditionText, active && styles.conditionTextActive]}>
+                          {lg}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            {form.deal === 'sale' && (form.type === 'nha_nguyen_can' || form.type === 'can_ho') && (
+              <>
+                <Text style={styles.fieldLabel}>Nội thất</Text>
+                <View style={styles.chipWrap}>
+                  {FURNISHED_OPTIONS.map((o) => {
+                    const active = form.furnished === o.value;
+                    return (
+                      <TouchableOpacity
+                        key={o.value}
+                        style={[styles.conditionChip, active && styles.conditionChipActive]}
+                        onPress={() => set('furnished', active ? '' : o.value)}
+                      >
+                        <Ionicons
+                          name={active ? 'radio-button-on' : 'radio-button-off'}
+                          size={15}
+                          color={active ? COLORS.warmGold : COLORS.grayMedium}
+                        />
+                        <Text style={[styles.conditionText, active && styles.conditionTextActive]}>
+                          {o.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </>
         )}
 
@@ -675,7 +882,7 @@ export default function PostScreen() {
                   {form.title}
                 </Text>
                 <Text style={styles.previewPrice}>
-                  {formatPriceShort(Number(form.price))}/tháng
+                  {formatDealPrice(Number(form.price), form.deal)}
                 </Text>
                 <Text style={styles.previewMeta} numberOfLines={1}>
                   {form.area}m² • {form.ward || district?.name}
@@ -714,8 +921,39 @@ export default function PostScreen() {
             <View style={styles.summarySection}>
               <Text style={styles.summaryLabel}>Loại hình</Text>
               <Text style={styles.summaryText}>
-                {selectedType?.label} • {form.bedrooms} phòng ngủ • {form.bathrooms} toilet
+                {dealLabel(form.deal)} • {selectedType?.label} • {form.bedrooms} phòng ngủ •{' '}
+                {form.bathrooms} toilet
               </Text>
+              <View style={styles.summaryChips}>
+                {form.direction && (
+                  <View style={styles.summaryChip}>
+                    <Text style={styles.summaryChipText}>Hướng {form.direction}</Text>
+                  </View>
+                )}
+                {form.type === 'nha_nguyen_can' && (
+                  <View style={styles.summaryChip}>
+                    <Text style={styles.summaryChipText}>{form.floors} tầng</Text>
+                  </View>
+                )}
+                {(form.type === 'nha_nguyen_can' || form.type === 'dat_nen') &&
+                  form.frontage && (
+                    <View style={styles.summaryChip}>
+                      <Text style={styles.summaryChipText}>MT {form.frontage}m</Text>
+                    </View>
+                  )}
+                {form.legal && (
+                  <View style={styles.summaryChip}>
+                    <Text style={styles.summaryChipText}>{form.legal}</Text>
+                  </View>
+                )}
+                {form.furnished && (
+                  <View style={styles.summaryChip}>
+                    <Text style={styles.summaryChipText}>
+                      {FURNISHED_OPTIONS.find((o) => o.value === form.furnished)?.label}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             <TouchableOpacity style={styles.termsRow} onPress={() => set('termsAccepted', !form.termsAccepted)}>
@@ -1042,6 +1280,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 8,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
   },
   conditionChip: {
     flexDirection: 'row',

@@ -1,3 +1,15 @@
+import type { DealType } from '@/types';
+
+/** Label hình thức: "Bán" / "Cho thuê" */
+export function dealLabel(deal?: DealType | null): string {
+  return deal === 'sale' ? 'Bán' : 'Cho thuê';
+}
+
+/** "3.5 triệu/tháng" (thuê) hoặc "5.2 tỷ" (bán) theo hình thức của tin */
+export function formatDealPrice(price: number, deal?: DealType | null): string {
+  return formatPriceShort(price) + (deal === 'sale' ? '' : '/tháng');
+}
+
 /** Format giá VND → "3.5 triệu", "1.2 tỷ" */
 export function formatPrice(price: number): string {
   if (price >= 1_000_000_000) {
@@ -97,4 +109,14 @@ export const PRICE_PRESETS: { label: string; min: number | null; max: number | n
   { label: '5 - 8 triệu', min: 5_000_000, max: 8_000_000 },
   { label: '8 - 15 triệu', min: 8_000_000, max: 15_000_000 },
   { label: 'Trên 15 triệu', min: 15_000_000, max: null },
+];
+
+/** Khoảng giá dùng cho tin bán (đơn vị tỷ) */
+export const SALES_PRICE_PRESETS: { label: string; min: number | null; max: number | null }[] = [
+  { label: 'Tất cả mức giá', min: null, max: null },
+  { label: 'Dưới 1 tỷ', min: null, max: 1_000_000_000 },
+  { label: '1 - 3 tỷ', min: 1_000_000_000, max: 3_000_000_000 },
+  { label: '3 - 5 tỷ', min: 3_000_000_000, max: 5_000_000_000 },
+  { label: '5 - 10 tỷ', min: 5_000_000_000, max: 10_000_000_000 },
+  { label: 'Trên 10 tỷ', min: 10_000_000_000, max: null },
 ];

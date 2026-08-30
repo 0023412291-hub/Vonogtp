@@ -65,13 +65,21 @@ export function subscribeListings(
 }
 
 /** Theo dõi realtime danh sách id tin yêu thích của một user */
-export function subscribeFavorites(uid: string, callback: (ids: string[]) => void): () => void {
+export function subscribeFavorites(
+  uid: string,
+  callback: (ids: string[]) => void,
+  onError?: (error: unknown) => void,
+): () => void {
   const ref = doc(getFirebaseDb(), 'favorites', uid);
-  return onSnapshot(ref, (snap) => {
-    const data = snap.data();
-    const ids = data?.listingIds;
-    callback(Array.isArray(ids) ? (ids as string[]) : []);
-  });
+  return onSnapshot(
+    ref,
+    (snap) => {
+      const data = snap.data();
+      const ids = data?.listingIds;
+      callback(Array.isArray(ids) ? (ids as string[]) : []);
+    },
+    (error) => onError?.(error),
+  );
 }
 
 /** Thêm/bỏ một tin vào danh sách yêu thích của user trên Firestore */
@@ -83,6 +91,19 @@ export async function toggleFavoriteRemote(uid: string, listingId: string): Prom
       ? ((current.data()?.listingIds as unknown[]) as string[])
       : [];
   const next = ids.includes(listingId) ? ids.filter((x) => x !== listingId) : [...ids, listingId];
+  await setDoc(ref, { listingIds: next }, { merge: true });
+}
+
+/** Bỏ một tin khỏi danh sách yêu thích (dùng khi tin đã bị xóa) */
+export async function removeFavoriteRemote(uid: string, listingId: string): Promise<void> {
+  const ref = doc(getFirebaseDb(), 'favorites', uid);
+  const current = await getDoc(ref);
+  const ids: string[] =
+    current.exists() && Array.isArray(current.data()?.listingIds)
+      ? ((current.data()?.listingIds as unknown[]) as string[])
+      : [];
+  const next = ids.filter((x) => x !== listingId);
+  if (next.length === ids.length) return;
   await setDoc(ref, { listingIds: next }, { merge: true });
 }
 
@@ -169,14 +190,24 @@ export async function addLeadRemote(params: {
 /**
  * Theo dõi realtime khách quan tâm của một chủ tin (chỉ lead thật theo ownerUid).
  */
-export function subscribeLeads(uid: string, callback: (leads: Lead[]) => void): () => void {
+export function subscribeLeads(
+  uid: string,
+  callback: (leads: Lead[]) => void,
+  onError?: (error: unknown) => void,
+): () => void {
   const db = getFirebaseDb();
   const ownQuery = query(collection(db, 'leads'), where('ownerUid', '==', uid));
 
   let active = true;
-  const unsubOwn = onSnapshot(ownQuery, (snap) => {
-    if (active) callback(snap.docs.map((d) => normalizeLead(d.id, d.data())));
-  });
+  const unsubOwn = onSnapshot(
+    ownQuery,
+    (snap) => {
+      if (active) callback(snap.docs.map((d) => normalizeLead(d.id, d.data())));
+    },
+    (error) => {
+      if (active) onError?.(error);
+    },
+  );
 
   return () => {
     active = false;

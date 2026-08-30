@@ -20,7 +20,7 @@ import { COLORS, TYPOGRAPHY } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
 import {
   authErrorMessage,
-  fetchUserProfile,
+  fetchUserProfileWithRetry,
   formatPhoneVN,
   normalizeVietnamesePhone,
   saveUserProfile,
@@ -29,6 +29,7 @@ import {
   signUpWithEmail,
 } from '@/firebase/auth';
 import { isValidEmail, isValidPhone } from '@/utils/validation';
+import type { User } from '@/types';
 
 type Mode = 'login' | 'register';
 
@@ -76,9 +77,16 @@ export default function AuthScreen() {
         });
         signIn({ uid, name: name.trim(), phone, email: email.trim(), role: 'renter' });
       } else {
-        // Đăng nhập → nạp hồ sơ từ Firestore vào app
+        // Đăng nhập → nạp hồ sơ từ Firestore vào app.
+        // Lỗi đọc hồ sơ (session vừa đổi, token Firestore chưa kịp cập nhật)
+        // KHÔNG được chặn đăng nhập — chỉ cần Auth thành công là vào được app.
         const uid = await signInWithEmail(email, password);
-        let profile = await fetchUserProfile(uid);
+        let profile: User | null = null;
+        try {
+          profile = await fetchUserProfileWithRetry(uid);
+        } catch (err) {
+          if (__DEV__) console.warn('[auth] Lỗi đọc hồ sơ sau đăng nhập (bỏ qua):', err);
+        }
         if (!profile) {
           profile = {
             uid,
@@ -87,7 +95,7 @@ export default function AuthScreen() {
             email: email.trim(),
             role: 'renter',
           };
-          await saveUserProfile({ ...profile, uid });
+          await saveUserProfile({ ...profile, uid }).catch(() => {});
         }
         signIn(profile);
       }
@@ -114,7 +122,12 @@ export default function AuthScreen() {
             await sendPasswordReset(email);
             Alert.alert('Đã gửi', 'Kiểm tra hộp thư (kể cả mục Spam) để đặt lại mật khẩu.');
           } catch (err) {
-            Alert.alert('Lỗi', authErrorMessage(err));
+            const code = String((err as { code?: string })?.code ?? '');
+            if (code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+              Alert.alert('Không gửi được', 'Không có tài khoản nào với email này. Hãy kiểm tra lại.');
+            } else {
+              Alert.alert('Lỗi', authErrorMessage(err));
+            }
           }
         },
       },

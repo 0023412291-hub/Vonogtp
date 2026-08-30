@@ -5,8 +5,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { COLORS } from '@/constants/colors';
 import { AppProvider } from '@/context/app-context';
-import { firebaseEnabled } from '@/firebase';
 import { getInitialPushRoute, onPushOpened } from '@/firebase/messaging';
+
+/**
+ * Auth + Firestore dùng Firebase JS SDK → luôn bật.
+ * Khai báo cục bộ thay vì import từ '@/firebase' vì barrel đó đã bị xóa.
+ */
+const firebaseEnabled = true;
 
 console.log('[BOOT] Bundle mới đã load — 20260823-1625');
 

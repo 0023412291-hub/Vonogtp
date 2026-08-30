@@ -22,7 +22,8 @@ import { BORDER_RADIUS, COLORS, SHADOWS } from '@/constants/colors';
 import { useApp } from '@/context/app-context';
 import { createOrGetConversation } from '@/firebase/chat';
 import type { PropertyType } from '@/types';
-import { formatDate, formatPriceShort } from '@/utils/formatters';
+import { FURNISHED_OPTIONS } from '@/types';
+import { formatDate, formatDealPrice } from '@/utils/formatters';
 
 const TYPE_LABELS: Record<PropertyType, string> = {
   phong_tro: 'Phòng trọ',
@@ -81,7 +82,7 @@ export default function ListingDetailScreen() {
 
   const handleShare = () => {
     Share.share({
-      message: `${listing.title}\n${formatPriceShort(listing.price)}/tháng • ${listing.area}m² • ${listing.district}\nXem trên VoNo - Tìm Nhà Nhanh`,
+      message: `${listing.title}\n${formatDealPrice(listing.price, listing.deal)} • ${listing.area}m² • ${listing.district}\nXem trên VoNo - Tìm Nhà Nhanh`,
     }).catch(() => {});
   };
 
@@ -119,6 +120,20 @@ export default function ListingDetailScreen() {
     { icon: 'pricetag-outline', label: 'Loại hình', value: TYPE_LABELS[listing.type] },
   ];
 
+  if (listing.direction) {
+    detailItems.push({ icon: 'compass-outline', label: 'Hướng', value: listing.direction });
+  }
+  if (listing.legal) {
+    detailItems.push({ icon: 'document-text-outline', label: 'Pháp lý', value: listing.legal });
+  }
+  if (listing.frontage != null) {
+    detailItems.push({ icon: 'resize-outline', label: 'Mặt tiền', value: `${listing.frontage}m` });
+  }
+  if (listing.furnished) {
+    const label = FURNISHED_OPTIONS.find((o) => o.value === listing.furnished)?.label;
+    if (label) detailItems.push({ icon: 'bed-outline', label: 'Nội thất', value: label });
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
@@ -139,7 +154,10 @@ export default function ListingDetailScreen() {
         <View style={styles.titleSection}>
           <Text style={styles.title}>{listing.title}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatPriceShort(listing.price)}/tháng</Text>
+            <View style={styles.priceGroup}>
+              <Text style={styles.price}>{formatDealPrice(listing.price, listing.deal)}</Text>
+              {listing.deal === 'sale' && <Text style={styles.saleTag}>Bán</Text>}
+            </View>
             {listing.rating != null && <RatingStars rating={listing.rating} count={listing.reviewCount} />}
           </View>
           <Text style={styles.meta}>
@@ -315,10 +333,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
+  priceGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
   price: {
     fontSize: 22,
     fontWeight: '800',
     color: COLORS.priceAccent,
+  },
+  saleTag: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.darkBrown,
+    backgroundColor: COLORS.warmGold,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: 'hidden',
   },
   meta: {
     fontSize: 13,

@@ -97,6 +97,37 @@ export async function fetchUserProfile(uid: string): Promise<User | null> {
   return snap.data() as User;
 }
 
+/**
+ * Đọc hồ sơ user, thử lại vài lần cho đến khi Auth ổn định đúng người dùng và
+ * Firestore có token mới nhất (session ẩn danh → tài khoản thật làm token cũ
+ * mất hiệu lực trong chốc lát, lần đọc đầu bị rules chặn).
+ */
+export async function fetchUserProfileWithRetry(uid: string, retries = 5): Promise<User | null> {
+  const auth = getFirebaseAuth();
+  let lastError: unknown;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const current = auth.currentUser;
+    if (!current || current.uid !== uid) {
+      // Auth chưa kịp chuyển sang người dùng mới → đợi rồi thử lại
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      continue;
+    }
+    try {
+      // Ép Auth phát token mới → Firestore bỏ token cũ (ẩn danh) và dùng đúng uid
+      try {
+        await current.getIdToken(true);
+      } catch {
+        // Ép token thất bại tạm thời — vẫn thử đọc bình thường
+      }
+      return await fetchUserProfile(uid);
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 /** Ghi hồ sơ user vào Firestore (tạo mới hoặc cập nhật) */
 export async function saveUserProfile(user: User & { uid: string }): Promise<void> {
   await setDoc(doc(getFirebaseDb(), 'users', user.uid), user, { merge: true });
@@ -128,7 +159,6 @@ export async function ensureSessionSignIn(): Promise<void> {
     return;
   }
   try {
-<<<<<<< HEAD
     // Chống treo vĩnh viễn: quá 10s coi như thất bại để caller biết mà xử lý
     await Promise.race([
       signInAnonymously(auth),
@@ -147,11 +177,6 @@ export async function ensureSessionSignIn(): Promise<void> {
       (error as { code?: string })?.code,
       (error as { message?: string })?.message,
     );
-=======
-    await signInAnonymously(auth);
-  } catch {
-    // Lỗi hiếm gặp (mất mạng / provider bị tắt) — app vẫn chạy, chỉ bỏ qua phần ghi của khách
->>>>>>> 6401da55dcb4a52b7785da32ccfb9769869d677e
   }
 }
 

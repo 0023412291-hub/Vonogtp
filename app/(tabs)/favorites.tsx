@@ -48,7 +48,7 @@ export default function FavoritesScreen() {
           <Ionicons name="heart" size={20} color={COLORS.warmGold} />
           <Text style={styles.title}>Tin Yêu Thích</Text>
           <View style={styles.countBadge}>
-            <Text style={styles.countText}>{favorites.length}</Text>
+            <Text style={styles.countText}>{favListings.length}</Text>
           </View>
         </View>
       </View>
@@ -84,6 +84,7 @@ export default function FavoritesScreen() {
           data={favListings}
           keyExtractor={(item) => item.id}
           numColumns={2}
+          extraData={favorites}
           columnWrapperStyle={styles.gridRow}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
