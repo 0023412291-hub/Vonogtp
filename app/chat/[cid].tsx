@@ -167,7 +167,8 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <View style={{ paddingTop: insets.top }}>
         <Header peerName={peerName} listingTitle={conversation?.listingTitle ?? ''} onBack={() => router.back()} />
@@ -306,19 +307,26 @@ const styles = StyleSheet.create({
   },
   msgRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   msgRowMine: {
     justifyContent: 'flex-end',
+    paddingLeft: 40,
   },
   msgRowTheirs: {
     justifyContent: 'flex-start',
+    paddingRight: 40,
   },
   bubble: {
     maxWidth: '78%',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 17,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   bubbleMine: {
     backgroundColor: COLORS.warmGold,
