@@ -77,7 +77,10 @@ export default function SearchScreen() {
   const [legals, setLegals] = useState<Legal[]>(filters.legals);
   const [focusId, setFocusId] = useState<string | null>(params.focus ?? null);
   const [mapView, setMapView] = useState<'map' | 'list'>('map');
+  const [radiusCenter, setRadiusCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [radiusKm, setRadiusKm] = useState(5);
   const mapRef = useRef<any>(null);
+  const Circle: any = MapView ? require('react-native-maps').Circle : null;
 
   // Chưa có vị trí (bỏ qua màn hình cấp quyền / mở lại app) → xin vị trí ngay tại đây
   useEffect(() => {
@@ -129,7 +132,10 @@ export default function SearchScreen() {
     maxDistanceKm: tab === 'school' ? maxDistance : null,
   };
   const resultCount = filterListings(listings, localFilters).length;
-  const mapListings = filterListings(listings, localFilters);
+  const mapListings = filterListings(listings, localFilters).filter((l) => {
+    if (!radiusCenter) return true;
+    return distanceKm(l, radiusCenter) <= radiusKm;
+  });
 
   useEffect(() => {
     if (focusId && MapView && mapRef.current) {
@@ -510,6 +516,10 @@ export default function SearchScreen() {
           style={StyleSheet.absoluteFill}
           showsUserLocation
           showsMyLocationButton={false}
+          onPress={(e: any) => {
+            const { latitude, longitude } = e.nativeEvent.coordinate;
+            setRadiusCenter({ latitude, longitude });
+          }}
           initialRegion={{
             latitude: focused?.latitude ?? homeRegion.latitude,
             longitude: focused?.longitude ?? homeRegion.longitude,
@@ -523,13 +533,22 @@ export default function SearchScreen() {
               coordinate={{ latitude: l.latitude, longitude: l.longitude }}
               title={l.title}
               description={formatDealPrice(l.price, l.deal)}
+              pinColor={focusId === l.id ? COLORS.warmGold : '#E05252'}
               onPress={() => setFocusId(l.id)}
-            >
-              <View style={[styles.markerPin, focusId === l.id && styles.markerPinActive]}>
-                <Ionicons name="home" size={13} color={COLORS.white} />
-              </View>
-            </Marker>
+            />
           ))}
+          {radiusCenter && Circle && (
+            <Circle
+              center={radiusCenter}
+              radius={radiusKm * 1000}
+              strokeColor="rgba(194, 130, 42, 0.6)"
+              strokeWidth={2}
+              fillColor="rgba(194, 130, 42, 0.12)"
+            />
+          )}
+          {radiusCenter && Marker && (
+            <Marker coordinate={radiusCenter} pinColor="#3B82F6" />
+          )}
         </MapView>
 
         <TouchableOpacity
@@ -544,7 +563,7 @@ export default function SearchScreen() {
           <Ionicons name="locate" size={18} color={COLORS.darkBrown} />
         </TouchableOpacity>
 
-        {hasUserLocation && (
+        {hasUserLocation && !radiusCenter && (
           <View style={styles.userLocationBadge}>
             <Ionicons name="navigate" size={12} color={COLORS.warmGold} />
             <Text style={styles.userLocationText}>Bạn ở đây</Text>
@@ -557,9 +576,35 @@ export default function SearchScreen() {
           </Text>
         </View>
 
+        {radiusCenter && (
+          <View style={styles.radiusPanel}>
+            <View style={styles.radiusHeader}>
+              <Ionicons name="locate" size={15} color={COLORS.warmGold} />
+              <Text style={styles.radiusTitle}>Khu vực quanh điểm đã chọn</Text>
+              <TouchableOpacity onPress={() => setRadiusCenter(null)} hitSlop={6}>
+                <Ionicons name="close" size={18} color={COLORS.grayMedium} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.radiusRow}>
+              <Text style={styles.radiusValue}>{radiusKm} km</Text>
+              <Slider
+                style={styles.radiusSlider}
+                minimumValue={1}
+                maximumValue={20}
+                step={1}
+                value={radiusKm}
+                onValueChange={setRadiusKm}
+                minimumTrackTintColor={COLORS.warmGold}
+                maximumTrackTintColor={COLORS.border}
+                thumbTintColor={COLORS.warmGold}
+              />
+            </View>
+          </View>
+        )}
+
         {focused && (
           <TouchableOpacity
-            style={styles.mapCard}
+            style={[styles.mapCard, radiusCenter && styles.mapCardWithRadius]}
             activeOpacity={0.9}
             onPress={() => {
               updateFilters(localFilters);
@@ -960,6 +1005,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  radiusPanel: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 14,
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+    ...SHADOWS.medium,
+  },
+  radiusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  radiusTitle: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+  },
+  radiusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  radiusValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.warmGold,
+    width: 52,
+  },
+  radiusSlider: {
+    flex: 1,
+    height: 36,
+  },
   mapCard: {
     position: 'absolute',
     bottom: 14,
@@ -972,6 +1054,9 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 10,
     ...SHADOWS.dark,
+  },
+  mapCardWithRadius: {
+    bottom: 132,
   },
   mapCardImg: {
     width: 72,
