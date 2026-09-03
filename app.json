@@ -2,6 +2,7 @@
   "expo": {
     "name": "VoNo - Tìm Nhà Nhanh",
     "slug": "vono-tim-nha-nhanh",
+    "owner": "tranne",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -14,7 +15,9 @@
       "supportsTablet": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -81,7 +84,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "16cc11ec-e878-43da-b01f-5cff17632843"
+        "projectId": "12c7b37d-ede7-41d3-a5e1-b07b7be3ae76"
       }
     }
   }

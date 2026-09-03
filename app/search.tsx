@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Slider from '@react-native-community/slider';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  FlatList,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/action-button';
+import { ListingCard } from '@/components/listing-card';
 import { SearchBar } from '@/components/search-bar';
 import { Segmented } from '@/components/segmented';
 import { Stepper } from '@/components/stepper';
@@ -74,6 +76,7 @@ export default function SearchScreen() {
   const [directions, setDirections] = useState<Direction[]>(filters.directions);
   const [legals, setLegals] = useState<Legal[]>(filters.legals);
   const [focusId, setFocusId] = useState<string | null>(params.focus ?? null);
+  const [mapView, setMapView] = useState<'map' | 'list'>('map');
   const mapRef = useRef<any>(null);
 
   // Chưa có vị trí (bỏ qua màn hình cấp quyền / mở lại app) → xin vị trí ngay tại đây
@@ -88,7 +91,7 @@ export default function SearchScreen() {
         }
         if (!perm.granted || !active) return;
         const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+          accuracy: Location.Accuracy.High,
         });
         if (active) {
           setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
@@ -139,6 +142,25 @@ export default function SearchScreen() {
       }
     }
   }, [focusId, listings]);
+
+  // Vị trí người dùng vừa mới có (lần chạy app mới / mới bật quyền) →
+  // bản đồ tự động trỏ về đúng vị trí hiện tại thay vì "kẹt" ở tâm mặc định.
+  const centeredOnUser = useRef(false);
+  useEffect(() => {
+    if (!MapView || !userLocation || centeredOnUser.current) return;
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          latitudeDelta: 0.045,
+          longitudeDelta: 0.045,
+        },
+        600,
+      );
+    }
+    centeredOnUser.current = true;
+  }, [userLocation, focusId]);
 
   const apply = () => {
     updateFilters({
@@ -422,23 +444,68 @@ export default function SearchScreen() {
   );
 
   const renderMapTab = () => {
-    if (!MapView || Platform.OS === 'web') {
-      return (
-        <View style={styles.mapFallback}>
-          <Ionicons name="map-outline" size={44} color={COLORS.grayMedium} />
-          <Text style={styles.mapFallbackTitle}>Bản đồ chỉ khả dụng trên thiết bị di động</Text>
-          <Text style={styles.mapFallbackMsg}>Mở app bằng Expo Go trên iOS/Android để xem bản đồ trực quan (Hướng C).</Text>
-        </View>
-      );
-    }
-
     const focused = focusId ? mapListings.find((l) => l.id === focusId) : null;
     const hasUserLocation = userLocation != null;
     const homeRegion = userLocation ?? HCMC_CENTER;
 
+    const mapAvailable = !!MapView && Platform.OS !== 'web';
+
     return (
-      <View style={styles.mapWrap}>
-        <MapView
+      <View style={styles.mapTabRoot}>
+        {/* Nút chuyển rõ ràng giữa Danh sách / Bản đồ */}
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            style={[styles.viewToggleBtn, mapView === 'list' && styles.viewToggleBtnActive]}
+            onPress={() => setMapView('list')}
+          >
+            <Ionicons name="list" size={15} color={mapView === 'list' ? COLORS.white : COLORS.darkBrown} />
+            <Text style={[styles.viewToggleText, mapView === 'list' && styles.viewToggleTextActive]}>
+              Danh sách ({mapListings.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewToggleBtn, mapView === 'map' && styles.viewToggleBtnActive]}
+            onPress={() => setMapView('map')}
+            disabled={!mapAvailable}
+          >
+            <Ionicons name="map" size={15} color={mapView === 'map' ? COLORS.white : COLORS.darkBrown} />
+            <Text style={[styles.viewToggleText, mapView === 'map' && styles.viewToggleTextActive]}>
+              Bản đồ
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {mapView === 'list' ? (
+          <FlatList
+            data={mapListings}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            ListEmptyComponent={
+              <View style={styles.listEmpty}>
+                <Ionicons name="search-outline" size={40} color={COLORS.grayMedium} />
+                <Text style={styles.listEmptyText}>Không có tin phù hợp với bộ lọc</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <ListingCard
+                listing={item}
+                variant="list"
+                onPress={() => {
+                  updateFilters(localFilters);
+                  router.push(`/listing/${item.id}`);
+                }}
+              />
+            )}
+          />
+        ) : !mapAvailable ? (
+          <View style={styles.mapFallback}>
+            <Ionicons name="map-outline" size={44} color={COLORS.grayMedium} />
+            <Text style={styles.mapFallbackTitle}>Bản đồ chỉ khả dụng trên thiết bị di động</Text>
+            <Text style={styles.mapFallbackMsg}>Trên máy bạn có thể xem ở chế độ Danh sách bên trên.</Text>
+          </View>
+        ) : (
+          <View style={styles.mapWrap}>
+            <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFill}
           showsUserLocation
@@ -514,6 +581,8 @@ export default function SearchScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={COLORS.grayMedium} />
           </TouchableOpacity>
+        )}
+          </View>
         )}
       </View>
     );
@@ -763,6 +832,55 @@ const styles = StyleSheet.create({
   mapWrap: {
     flex: 1,
     position: 'relative',
+  },
+  mapTabRoot: {
+    flex: 1,
+  },
+  viewToggle: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  viewToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  viewToggleBtnActive: {
+    backgroundColor: COLORS.warmGold,
+    borderColor: COLORS.warmGold,
+  },
+  viewToggleText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkBrown,
+  },
+  viewToggleTextActive: {
+    color: COLORS.white,
+  },
+  listContent: {
+    padding: 14,
+    gap: 12,
+  },
+  listEmpty: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 60,
+  },
+  listEmptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
   },
   mapFallback: {
     flex: 1,
