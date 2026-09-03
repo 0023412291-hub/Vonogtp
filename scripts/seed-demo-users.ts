@@ -244,10 +244,54 @@ async function main(): Promise<void> {
   });
   console.log('✓ favorites: 3 tin đã lưu cho người thuê demo');
 
+  // ---- 6) Conversation mẫu giữa chủ nhà và người thuê ----
+  const convId = `demo001_${[ownerUid, renterUid].sort().join('_')}`;
+  const now = Date.now();
+  const convRef = db.collection('conversations').doc(convId);
+  await convRef.set({
+    participants: [ownerUid, renterUid].sort(),
+    listingId: 'demo001',
+    listingTitle: 'Phòng trọ mới xây gần ĐH Kinh tế — chủ nhà demo',
+    memberInfo: {
+      [ownerUid]: { name: DEMO_OWNER.name },
+      [renterUid]: { name: DEMO_RENTER.name },
+    },
+    lastMessage: {
+      text: 'Phòng còn trống không ạ? Em muốn thuê',
+      senderUid: renterUid,
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    unread: { [ownerUid]: 2 },
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  // Tin nhắn mẫu trong conversation
+  const sampleMessages = [
+    { senderUid: renterUid, text: 'Chào anh/chị, em thấy tin phòng gần ĐH Kinh tế ạ', minutesAgo: 120 },
+    { senderUid: ownerUid, text: 'Chào em, phòng còn trống nhé. Em muốn xem lúc nào?', minutesAgo: 115 },
+    { senderUid: renterUid, text: 'Cho em hỏi phòng có WiFi và máy lạnh không ạ?', minutesAgo: 60 },
+    { senderUid: ownerUid, text: 'Có đầy đủ WiFi, máy lạnh, tủ lạnh, WC riêng nhé em', minutesAgo: 55 },
+    { senderUid: renterUid, text: 'Giá có thương lượng được không ạ? Em thuê dài hạn', minutesAgo: 30 },
+    { senderUid: ownerUid, text: 'Thuê dài hạn thì giảm được 200k/tháng, còn 4tr/tháng em nhé', minutesAgo: 25 },
+    { senderUid: renterUid, text: 'Phòng còn trống không ạ? Em muốn thuê', minutesAgo: 5 },
+  ];
+  const msgBatch = db.batch();
+  for (const msg of sampleMessages) {
+    const msgRef = convRef.collection('messages').doc();
+    msgBatch.set(msgRef, {
+      senderUid: msg.senderUid,
+      text: msg.text,
+      status: 'sent',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  }
+  await msgBatch.commit();
+  console.log(`✓ conversations: 1 hội thoại mẫu (${convId}) với ${sampleMessages.length} tin nhắn`);
+
   console.log(`
 Hoàn tất! Giờ Firestore có đủ:
-  users (${ownerUid.slice(0, 6)}…, ${renterUid.slice(0, 6)}…) · listings · favorites · leads · notifications
-Đăng nhập bằng email ${DEMO_OWNER.email} / mật khẩu ${DEMO_OWNER.password} sẽ thấy dashboard chủ nhà demo đầy đủ.
+  users (${ownerUid.slice(0, 6)}…, ${renterUid.slice(0, 6)}…) · listings · favorites · leads · notifications · conversations
+Đăng nhập email ${DEMO_OWNER.email} / ${DEMO_RENTER.email} (mật khẩu: vono123) để test chat.
 `);
 }
 

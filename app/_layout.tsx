@@ -62,6 +62,7 @@ export default function RootLayout() {
           <Stack.Screen name="terms" />
           <Stack.Screen name="support" />
           <Stack.Screen name="search" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="chat/[cid]" />
         </Stack>
         <StatusBar style="dark" />
       </AppProvider>
